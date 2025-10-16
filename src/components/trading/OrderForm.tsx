@@ -31,8 +31,13 @@ const OrderForm = ({ asset }: OrderFormProps) => {
       return;
     }
 
-    if (orderType === "limit" && (!price || Number(price) <= 0)) {
+    if ((orderType === "limit" || orderType === "stop") && (!price || Number(price) <= 0)) {
       toast.error("Please enter a valid price");
+      return;
+    }
+
+    if (orderType === "stop" && (!stopPrice || Number(stopPrice) <= 0)) {
+      toast.error("Please enter a valid stop price");
       return;
     }
 
@@ -43,7 +48,6 @@ const OrderForm = ({ asset }: OrderFormProps) => {
       const orderQuantity = Number(quantity);
       const totalCost = orderPrice * orderQuantity;
 
-      // Check balance for buy orders
       if (side === "buy") {
         const { data: balanceData } = await supabase
           .from("user_balances")
@@ -58,7 +62,6 @@ const OrderForm = ({ asset }: OrderFormProps) => {
         }
       }
 
-      // Create order
       const { error: orderError } = await supabase
         .from("orders")
         .insert({
@@ -78,9 +81,7 @@ const OrderForm = ({ asset }: OrderFormProps) => {
 
       if (orderError) throw orderError;
 
-      // For market orders, execute immediately
       if (orderType === "market") {
-        // Update balance
         const balanceChange = side === "buy" ? -totalCost : totalCost;
         
         const { data: currentBalance } = await supabase
@@ -98,7 +99,6 @@ const OrderForm = ({ asset }: OrderFormProps) => {
             .eq("user_id", user.id);
         }
 
-        // Update or create portfolio entry
         const { data: existingPortfolio } = await supabase
           .from("portfolios")
           .select("*")
@@ -135,11 +135,13 @@ const OrderForm = ({ asset }: OrderFormProps) => {
 
         toast.success(`${side === "buy" ? "Bought" : "Sold"} ${orderQuantity} ${asset.symbol}`);
       } else {
-        toast.success("Limit order placed successfully");
+        const orderTypeLabel = orderType === "stop" ? "Stop" : orderSubtype === "ioc" ? "IOC" : orderSubtype === "fok" ? "FOK" : "Limit";
+        toast.success(`${orderTypeLabel} order placed successfully`);
       }
 
       setQuantity("");
       setPrice("");
+      setStopPrice("");
     } catch (error: any) {
       toast.error(error.message || "Failed to place order");
     } finally {
@@ -162,48 +164,33 @@ const OrderForm = ({ asset }: OrderFormProps) => {
         </TabsList>
 
         <TabsContent value={side} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label>Order Type</Label>
+            <Select value={orderType} onValueChange={setOrderType}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="market">Market</SelectItem>
+                <SelectItem value="limit">Limit</SelectItem>
+                <SelectItem value="stop">Stop</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {orderType === "limit" && (
             <div className="space-y-2">
-              <Label>Order Type</Label>
-              <Select value={orderType} onValueChange={setOrderType}>
+              <Label>Order Execution</Label>
+              <Select value={orderSubtype} onValueChange={setOrderSubtype}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="market">Market</SelectItem>
-                  <SelectItem value="limit">Limit</SelectItem>
-                  <SelectItem value="stop">Stop</SelectItem>
+                  <SelectItem value="standard">Standard</SelectItem>
+                  <SelectItem value="ioc">IOC (Immediate or Cancel)</SelectItem>
+                  <SelectItem value="fok">FOK (Fill or Kill)</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-
-            {(orderType === "limit" || orderType === "market") && (
-              <div className="space-y-2">
-                <Label>Execution</Label>
-                <Select value={orderSubtype} onValueChange={setOrderSubtype}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="standard">Standard</SelectItem>
-                    <SelectItem value="ioc">IOC</SelectItem>
-                    <SelectItem value="fok">FOK</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-
-          {orderType === "stop" && (
-            <div className="space-y-2">
-              <Label>Stop Price (USDT)</Label>
-              <Input
-                type="number"
-                placeholder="0.00"
-                value={stopPrice}
-                onChange={(e) => setStopPrice(e.target.value)}
-                step="0.01"
-              />
             </div>
           )}
 
@@ -217,6 +204,22 @@ const OrderForm = ({ asset }: OrderFormProps) => {
                 onChange={(e) => setPrice(e.target.value)}
                 step="0.01"
               />
+            </div>
+          )}
+
+          {orderType === "stop" && (
+            <div className="space-y-2">
+              <Label>Stop Price (USDT)</Label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={stopPrice}
+                onChange={(e) => setStopPrice(e.target.value)}
+                step="0.01"
+              />
+              <p className="text-xs text-muted-foreground">
+                Order triggers when price reaches this level
+              </p>
             </div>
           )}
 

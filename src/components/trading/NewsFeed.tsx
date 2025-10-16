@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { Newspaper, TrendingUp, TrendingDown, AlertCircle } from "lucide-react";
+import { TrendingUp, TrendingDown, Newspaper } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NewsEvent {
@@ -11,7 +11,7 @@ interface NewsEvent {
   headline: string;
   content: string;
   event_type: string;
-  impact_type: string;
+  impact_type: 'bullish' | 'bearish' | 'neutral';
   impact_strength: number;
   created_at: string;
 }
@@ -25,26 +25,20 @@ const NewsFeed = () => {
         .from("news_events")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(20);
-
-      if (data) {
-        setNews(data);
-      }
+        .limit(10);
+      
+      if (data) setNews(data as NewsEvent[]);
     };
 
     fetchNews();
 
     const channel = supabase
-      .channel("news-updates")
+      .channel('news-updates')
       .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "news_events",
-        },
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'news_events' },
         (payload) => {
-          setNews((prev) => [payload.new as NewsEvent, ...prev].slice(0, 20));
+          setNews(prev => [payload.new as NewsEvent, ...prev].slice(0, 10));
         }
       )
       .subscribe();
@@ -54,85 +48,59 @@ const NewsFeed = () => {
     };
   }, []);
 
-  const getImpactIcon = (impactType: string) => {
+  const getImpactColor = (impactType: string) => {
     switch (impactType) {
-      case "bullish":
-        return <TrendingUp className="w-4 h-4 text-success" />;
-      case "bearish":
-        return <TrendingDown className="w-4 h-4 text-destructive" />;
-      default:
-        return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
+      case 'bullish': return 'text-success';
+      case 'bearish': return 'text-destructive';
+      default: return 'text-muted-foreground';
     }
   };
 
-  const getEventTypeBadge = (eventType: string) => {
-    const variants: Record<string, string> = {
-      earnings: "bg-purple-500/20 text-purple-300",
-      macro: "bg-blue-500/20 text-blue-300",
-      geopolitical: "bg-red-500/20 text-red-300",
-      sentiment: "bg-yellow-500/20 text-yellow-300",
-    };
-
-    return (
-      <Badge variant="outline" className={cn("text-xs", variants[eventType])}>
-        {eventType}
-      </Badge>
-    );
+  const getImpactIcon = (impactType: string) => {
+    switch (impactType) {
+      case 'bullish': return <TrendingUp className="w-3 h-3" />;
+      case 'bearish': return <TrendingDown className="w-3 h-3" />;
+      default: return <Newspaper className="w-3 h-3" />;
+    }
   };
 
   return (
-    <Card className="p-4">
+    <Card className="p-4 h-full">
       <div className="flex items-center gap-2 mb-4">
         <Newspaper className="w-5 h-5 text-primary" />
-        <h2 className="text-lg font-semibold">Market News</h2>
+        <h2 className="text-lg font-bold">Market News</h2>
       </div>
-
-      <ScrollArea className="h-[400px] pr-4">
-        <div className="space-y-3">
+      
+      <ScrollArea className="h-[350px]">
+        <div className="space-y-3 pr-4">
           {news.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              No news events yet. The market is calm.
+              No news events yet. Market events will appear here.
             </p>
           ) : (
-            news.map((event) => (
+            news.map((item) => (
               <div
-                key={event.id}
+                key={item.id}
                 className="p-3 rounded-lg bg-secondary/50 border border-border hover:bg-secondary transition-colors"
               >
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2">
-                    {getImpactIcon(event.impact_type)}
-                    {getEventTypeBadge(event.event_type)}
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(event.created_at).toLocaleTimeString()}
+                <div className="flex items-start gap-2 mb-1">
+                  <span className={cn("mt-0.5", getImpactColor(item.impact_type))}>
+                    {getImpactIcon(item.impact_type)}
                   </span>
-                </div>
-
-                <h3 className="font-semibold text-sm mb-1">{event.headline}</h3>
-                <p className="text-xs text-muted-foreground line-clamp-2">
-                  {event.content}
-                </p>
-
-                <div className="mt-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1 bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className={cn(
-                          "h-full transition-all",
-                          event.impact_type === "bullish"
-                            ? "bg-success"
-                            : event.impact_type === "bearish"
-                            ? "bg-destructive"
-                            : "bg-muted-foreground"
-                        )}
-                        style={{ width: `${event.impact_strength * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      Impact: {Math.round(event.impact_strength * 100)}%
-                    </span>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold line-clamp-2">{item.headline}</h3>
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      {item.content}
+                    </p>
                   </div>
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="outline" className="text-xs">
+                    {item.event_type}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(item.created_at).toLocaleTimeString()}
+                  </span>
                 </div>
               </div>
             ))
