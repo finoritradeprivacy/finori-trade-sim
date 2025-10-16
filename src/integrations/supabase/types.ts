@@ -17,8 +17,10 @@ export type Database = {
       assets: {
         Row: {
           asset_type: string
+          category: string
           created_at: string
           current_price: number
+          description: string | null
           id: string
           is_active: boolean | null
           market_cap: number | null
@@ -30,8 +32,10 @@ export type Database = {
         }
         Insert: {
           asset_type?: string
+          category?: string
           created_at?: string
           current_price: number
+          description?: string | null
           id?: string
           is_active?: boolean | null
           market_cap?: number | null
@@ -43,8 +47,10 @@ export type Database = {
         }
         Update: {
           asset_type?: string
+          category?: string
           created_at?: string
           current_price?: number
+          description?: string | null
           id?: string
           is_active?: boolean | null
           market_cap?: number | null
@@ -56,6 +62,50 @@ export type Database = {
         }
         Relationships: []
       }
+      news_events: {
+        Row: {
+          asset_id: string | null
+          content: string
+          created_at: string
+          event_type: string
+          headline: string
+          id: string
+          impact_strength: number
+          impact_type: string
+          scheduled_for: string | null
+        }
+        Insert: {
+          asset_id?: string | null
+          content: string
+          created_at?: string
+          event_type: string
+          headline: string
+          id?: string
+          impact_strength?: number
+          impact_type: string
+          scheduled_for?: string | null
+        }
+        Update: {
+          asset_id?: string | null
+          content?: string
+          created_at?: string
+          event_type?: string
+          headline?: string
+          id?: string
+          impact_strength?: number
+          impact_type?: string
+          scheduled_for?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "news_events_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           asset_id: string
@@ -64,6 +114,7 @@ export type Database = {
           filled_at: string | null
           filled_quantity: number | null
           id: string
+          order_subtype: string | null
           order_type: string
           price: number | null
           quantity: number
@@ -81,6 +132,7 @@ export type Database = {
           filled_at?: string | null
           filled_quantity?: number | null
           id?: string
+          order_subtype?: string | null
           order_type: string
           price?: number | null
           quantity: number
@@ -98,6 +150,7 @@ export type Database = {
           filled_at?: string | null
           filled_quantity?: number | null
           id?: string
+          order_subtype?: string | null
           order_type?: string
           price?: number | null
           quantity?: number
@@ -124,6 +177,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      player_stats: {
+        Row: {
+          achievements: Json | null
+          created_at: string
+          id: string
+          level: number | null
+          total_xp: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          achievements?: Json | null
+          created_at?: string
+          id?: string
+          level?: number | null
+          total_xp?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          achievements?: Json | null
+          created_at?: string
+          id?: string
+          level?: number | null
+          total_xp?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       portfolios: {
         Row: {

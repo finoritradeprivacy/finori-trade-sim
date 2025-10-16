@@ -16,9 +16,11 @@ interface OrderFormProps {
 const OrderForm = ({ asset }: OrderFormProps) => {
   const { user } = useAuth();
   const [orderType, setOrderType] = useState("market");
+  const [orderSubtype, setOrderSubtype] = useState("standard");
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
+  const [stopPrice, setStopPrice] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmitOrder = async () => {
@@ -63,9 +65,11 @@ const OrderForm = ({ asset }: OrderFormProps) => {
           user_id: user.id,
           asset_id: asset.id,
           order_type: orderType,
+          order_subtype: orderSubtype,
           side: side,
           quantity: orderQuantity,
-          price: orderType === "limit" ? orderPrice : null,
+          price: orderType === "limit" || orderType === "stop" ? orderPrice : null,
+          stop_price: orderType === "stop" ? Number(stopPrice) : null,
           status: orderType === "market" ? "filled" : "pending",
           filled_quantity: orderType === "market" ? orderQuantity : 0,
           average_fill_price: orderType === "market" ? orderPrice : 0,
@@ -158,20 +162,52 @@ const OrderForm = ({ asset }: OrderFormProps) => {
         </TabsList>
 
         <TabsContent value={side} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Order Type</Label>
-            <Select value={orderType} onValueChange={setOrderType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="market">Market</SelectItem>
-                <SelectItem value="limit">Limit</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Order Type</Label>
+              <Select value={orderType} onValueChange={setOrderType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="market">Market</SelectItem>
+                  <SelectItem value="limit">Limit</SelectItem>
+                  <SelectItem value="stop">Stop</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(orderType === "limit" || orderType === "market") && (
+              <div className="space-y-2">
+                <Label>Execution</Label>
+                <Select value={orderSubtype} onValueChange={setOrderSubtype}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">Standard</SelectItem>
+                    <SelectItem value="ioc">IOC</SelectItem>
+                    <SelectItem value="fok">FOK</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
-          {orderType === "limit" && (
+          {orderType === "stop" && (
+            <div className="space-y-2">
+              <Label>Stop Price (USDT)</Label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={stopPrice}
+                onChange={(e) => setStopPrice(e.target.value)}
+                step="0.01"
+              />
+            </div>
+          )}
+
+          {(orderType === "limit" || orderType === "stop") && (
             <div className="space-y-2">
               <Label>Price (USDT)</Label>
               <Input

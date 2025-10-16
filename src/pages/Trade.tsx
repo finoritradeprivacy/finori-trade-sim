@@ -10,6 +10,7 @@ import OrderForm from "@/components/trading/OrderForm";
 import Portfolio from "@/components/trading/Portfolio";
 import OpenOrders from "@/components/trading/OpenOrders";
 import TradeHistory from "@/components/trading/TradeHistory";
+import NewsFeed from "@/components/trading/NewsFeed";
 
 const Trade = () => {
   const { user, loading } = useAuth();
@@ -63,8 +64,15 @@ const Trade = () => {
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-8 space-y-4">
-            <PriceChart asset={selectedAsset} />
+          <div className="lg:col-span-9 space-y-4">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+              <div className="xl:col-span-2">
+                <PriceChart asset={selectedAsset} />
+              </div>
+              <div className="xl:col-span-1">
+                <NewsFeed />
+              </div>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <OpenOrders />
@@ -72,7 +80,7 @@ const Trade = () => {
             </div>
           </div>
 
-          <div className="lg:col-span-4 space-y-4">
+          <div className="lg:col-span-3 space-y-4">
             <OrderBook asset={selectedAsset} />
             <OrderForm asset={selectedAsset} />
             <Portfolio />
