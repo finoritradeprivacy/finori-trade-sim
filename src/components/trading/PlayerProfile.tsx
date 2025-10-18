@@ -1,73 +1,77 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Trophy, TrendingUp, Target, Award } from "lucide-react";
+import { TrendingUp, TrendingDown, Award, DollarSign } from "lucide-react";
 
-interface ProfileData {
+interface PlayerData {
   nickname: string;
   email: string;
-  win_rate: number;
-  total_trades: number;
-  total_profit_loss: number;
-}
-
-interface PlayerStatsData {
   level: number;
   total_xp: number;
-  achievements: any;
+  achievements: any[];
+  total_trades: number;
+  win_rate: number;
+  total_profit_loss: number;
+  usdt_balance: number;
 }
 
 const PlayerProfile = () => {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [playerStats, setPlayerStats] = useState<PlayerStatsData | null>(null);
+  const [playerData, setPlayerData] = useState<PlayerData | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchProfileData = async () => {
+    const fetchPlayerData = async () => {
       if (!user) return;
 
-      // Fetch profile
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("nickname, email, win_rate, total_trades, total_profit_loss")
-        .eq("id", user.id)
-        .single();
+      try {
+        const [profileRes, statsRes, balanceRes] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", user.id)
+            .single(),
+          supabase
+            .from("player_stats")
+            .select("*")
+            .eq("user_id", user.id)
+            .maybeSingle(),
+          supabase
+            .from("user_balances")
+            .select("*")
+            .eq("user_id", user.id)
+            .single(),
+        ]);
 
-      if (profileData) {
-        setProfile(profileData);
-      }
-
-      // Fetch player stats
-      const { data: statsData } = await supabase
-        .from("player_stats")
-        .select("level, total_xp, achievements")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (statsData) {
-        setPlayerStats(statsData);
+        if (profileRes.data) {
+          setPlayerData({
+            nickname: profileRes.data.nickname,
+            email: profileRes.data.email,
+            level: statsRes.data?.level || 1,
+            total_xp: statsRes.data?.total_xp || 0,
+            achievements: Array.isArray(statsRes.data?.achievements) ? statsRes.data.achievements : [],
+            total_trades: profileRes.data.total_trades || 0,
+            win_rate: profileRes.data.win_rate || 0,
+            total_profit_loss: profileRes.data.total_profit_loss || 0,
+            usdt_balance: balanceRes.data?.usdt_balance || 0,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching player data:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchProfileData();
+    fetchPlayerData();
 
-    // Set up real-time subscription
+    // Subscribe to real-time updates
     const channel = supabase
-      .channel("player-profile-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "profiles",
-          filter: `id=eq.${user?.id}`,
-        },
-        () => fetchProfileData()
-      )
+      .channel("player-data-changes")
       .on(
         "postgres_changes",
         {
@@ -76,7 +80,27 @@ const PlayerProfile = () => {
           table: "player_stats",
           filter: `user_id=eq.${user?.id}`,
         },
-        () => fetchProfileData()
+        () => fetchPlayerData()
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${user?.id}`,
+        },
+        () => fetchPlayerData()
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "user_balances",
+          filter: `user_id=eq.${user?.id}`,
+        },
+        () => fetchPlayerData()
       )
       .subscribe();
 
@@ -85,102 +109,110 @@ const PlayerProfile = () => {
     };
   }, [user]);
 
-  if (!profile) {
+  if (loading || !playerData) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="animate-pulse space-y-4">
-            <div className="h-16 w-16 rounded-full bg-muted"></div>
-            <div className="h-4 bg-muted rounded w-3/4"></div>
-            <div className="h-4 bg-muted rounded w-1/2"></div>
-          </div>
-        </CardContent>
+      <Card className="p-4">
+        <div className="animate-pulse space-y-3">
+          <div className="h-4 bg-muted rounded w-3/4"></div>
+          <div className="h-4 bg-muted rounded w-1/2"></div>
+        </div>
       </Card>
     );
   }
 
-  const xpToNextLevel = playerStats ? (playerStats.level * 1000) : 1000;
-  const currentLevelXp = playerStats ? playerStats.total_xp % xpToNextLevel : 0;
-  const xpProgress = playerStats ? (currentLevelXp / xpToNextLevel) * 100 : 0;
+  const xpForNextLevel = playerData.level * 1000;
+  const xpProgress = (playerData.total_xp % 1000) / 10;
+  const isProfitable = playerData.total_profit_loss >= 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Trophy className="h-5 w-5 text-primary" />
-          Profil hráče
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* User Info */}
-        <div className="flex items-center gap-4">
-          <Avatar className="h-16 w-16">
-            <AvatarFallback className="text-lg bg-primary text-primary-foreground">
-              {profile.nickname.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <h3 className="font-semibold text-lg">{profile.nickname}</h3>
-            <p className="text-sm text-muted-foreground">{profile.email}</p>
+    <Card className="p-4 space-y-4">
+      <div className="flex items-start gap-3">
+        <Avatar className="h-12 w-12">
+          <AvatarFallback className="bg-primary text-primary-foreground font-bold">
+            {playerData.nickname.substring(0, 2).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-semibold text-foreground truncate">
+              {playerData.nickname}
+            </h3>
+            <Badge variant="secondary" className="text-xs">
+              Level {playerData.level}
+            </Badge>
+          </div>
+          
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>XP: {playerData.total_xp % 1000} / 1000</span>
+              <span>{xpProgress.toFixed(0)}%</span>
+            </div>
+            <Progress value={xpProgress} className="h-1.5" />
           </div>
         </div>
+      </div>
 
-        {/* Level & XP */}
-        {playerStats && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Level {playerStats.level}</span>
-              <Badge variant="outline">
-                {currentLevelXp} / {xpToNextLevel} XP
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <DollarSign className="h-3.5 w-3.5" />
+            <span>Balance</span>
+          </div>
+          <p className="font-semibold text-foreground">
+            ${playerData.usdt_balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            {isProfitable ? (
+              <TrendingUp className="h-3.5 w-3.5 text-success" />
+            ) : (
+              <TrendingDown className="h-3.5 w-3.5 text-destructive" />
+            )}
+            <span>Total P&L</span>
+          </div>
+          <p className={`font-semibold ${isProfitable ? 'text-success' : 'text-destructive'}`}>
+            {isProfitable ? '+' : ''}${playerData.total_profit_loss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <Award className="h-3.5 w-3.5" />
+            <span>Win Rate</span>
+          </div>
+          <p className="font-semibold text-foreground">
+            {playerData.win_rate.toFixed(1)}%
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <div className="text-muted-foreground">
+            <span>Total Trades</span>
+          </div>
+          <p className="font-semibold text-foreground">
+            {playerData.total_trades}
+          </p>
+        </div>
+      </div>
+
+      {playerData.achievements.length > 0 && (
+        <div className="pt-3 border-t">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+            <Award className="h-3.5 w-3.5" />
+            <span>Achievements</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {playerData.achievements.slice(0, 6).map((achievement: any, index: number) => (
+              <Badge key={index} variant="outline" className="text-xs">
+                {achievement.name || `Achievement ${index + 1}`}
               </Badge>
-            </div>
-            <Progress value={xpProgress} className="h-2" />
-          </div>
-        )}
-
-        {/* Trading Stats */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-1 text-muted-foreground text-xs">
-              <Target className="h-3 w-3" />
-              <span>Win Rate</span>
-            </div>
-            <p className="text-lg font-semibold">{profile.win_rate.toFixed(1)}%</p>
-          </div>
-          
-          <div className="space-y-1">
-            <div className="flex items-center gap-1 text-muted-foreground text-xs">
-              <TrendingUp className="h-3 w-3" />
-              <span>Celkem obchodů</span>
-            </div>
-            <p className="text-lg font-semibold">{profile.total_trades}</p>
-          </div>
-          
-          <div className="col-span-2 space-y-1">
-            <div className="flex items-center gap-1 text-muted-foreground text-xs">
-              <Award className="h-3 w-3" />
-              <span>Celkový P/L</span>
-            </div>
-            <p className={`text-lg font-semibold ${profile.total_profit_loss >= 0 ? 'text-success' : 'text-destructive'}`}>
-              {profile.total_profit_loss >= 0 ? '+' : ''}{profile.total_profit_loss.toFixed(2)} USDT
-            </p>
+            ))}
           </div>
         </div>
-
-        {/* Achievements */}
-        {playerStats && Array.isArray(playerStats.achievements) && playerStats.achievements.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium">Úspěchy</h4>
-            <div className="flex flex-wrap gap-2">
-              {playerStats.achievements.map((achievement: any, index: number) => (
-                <Badge key={index} variant="secondary">
-                  {achievement.name || achievement}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
-      </CardContent>
+      )}
     </Card>
   );
 };
