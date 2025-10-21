@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { usePriceUpdates } from "@/hooks/usePriceUpdates";
 import Header from "@/components/trading/Header";
 import AssetSelector from "@/components/trading/AssetSelector";
 import PriceChart from "@/components/trading/PriceChart";
@@ -18,6 +19,9 @@ const Trade = () => {
   const navigate = useNavigate();
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   const [assets, setAssets] = useState<any[]>([]);
+  
+  // Enable automatic price updates every 10 seconds
+  usePriceUpdates();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -40,6 +44,30 @@ const Trade = () => {
     };
 
     fetchAssets();
+
+    // Subscribe to real-time updates for asset prices
+    const channel = supabase
+      .channel('assets-updates')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'assets' },
+        (payload) => {
+          setAssets(prev => 
+            prev.map(asset => 
+              asset.id === payload.new.id ? payload.new : asset
+            )
+          );
+          // Update selected asset if it's the one that changed
+          setSelectedAsset(prev => 
+            prev?.id === payload.new.id ? payload.new : prev
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   if (loading || !user) {
