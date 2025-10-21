@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePriceUpdates } from "@/hooks/usePriceUpdates";
 import Header from "@/components/trading/Header";
 import AssetSelector from "@/components/trading/AssetSelector";
-import PriceChart from "@/components/trading/PriceChart";
+import { TradingChart } from "@/components/trading/TradingChart";
 import OrderBook from "@/components/trading/OrderBook";
 import OrderForm from "@/components/trading/OrderForm";
 import Portfolio from "@/components/trading/Portfolio";
@@ -96,7 +96,7 @@ const Trade = () => {
           <div className="lg:col-span-9 space-y-4">
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
               <div className="xl:col-span-2">
-                <PriceChart asset={selectedAsset} />
+                <TradingChart asset={selectedAsset} />
               </div>
               <div className="xl:col-span-1">
                 <NewsFeed />
