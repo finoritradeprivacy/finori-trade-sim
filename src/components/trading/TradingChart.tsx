@@ -142,7 +142,8 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
     const now = Math.floor(Date.now() / 1000);
     const timeframeSeconds = getTimeframeSeconds(timeframe);
 
-    for (let i = 100; i >= 0; i--) {
+    // Generate exactly 100 candles with unique timestamps
+    for (let i = 100; i > 0; i--) {
       const time = (now - i * timeframeSeconds) as UTCTimestamp;
       const open = basePrice * (1 + (Math.random() - 0.5) * 0.02);
       const close = open * (1 + (Math.random() - 0.5) * 0.015);
@@ -158,6 +159,7 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
       });
     }
 
+    // Clear existing data and set new data
     candlestickSeriesRef.current.setData(data);
   };
 
@@ -205,12 +207,16 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
   const updateLastCandle = (newPrice: number) => {
     if (!candlestickSeriesRef.current) return;
 
-    const now = Math.floor(Date.now() / 1000) as UTCTimestamp;
+    // Get current timeframe interval
+    const timeframeSeconds = getTimeframeSeconds(timeframe);
+    const now = Math.floor(Date.now() / 1000);
     
-    // In real implementation, you'd fetch the current candle and update it
-    // For now, we'll create a new candle
+    // Calculate the start time of the current candle
+    const currentCandleTime = Math.floor(now / timeframeSeconds) * timeframeSeconds as UTCTimestamp;
+    
+    // Update the current candle (this will update if exists, or create if new interval)
     candlestickSeriesRef.current.update({
-      time: now,
+      time: currentCandleTime,
       open: newPrice,
       high: newPrice * 1.001,
       low: newPrice * 0.999,
@@ -256,22 +262,19 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
 
   // Draw trade markers on chart
   useEffect(() => {
-    if (!chartRef.current || trades.length === 0) return;
+    if (!candlestickSeriesRef.current || trades.length === 0) return;
 
-    trades.forEach(trade => {
-      const marker = {
-        time: trade.timestamp as UTCTimestamp,
-        position: trade.type === 'buy' ? 'belowBar' : 'aboveBar',
-        color: trade.type === 'buy' ? '#8b5cf6' : '#ef4444',
-        shape: trade.type === 'buy' ? 'arrowUp' : 'arrowDown',
-        text: `${trade.type.toUpperCase()} ${trade.amount} @ ${trade.price.toFixed(2)}`,
-      };
+    // Collect all markers
+    const markers = trades.map(trade => ({
+      time: trade.timestamp as UTCTimestamp,
+      position: (trade.type === 'buy' ? 'belowBar' : 'aboveBar') as 'belowBar' | 'aboveBar',
+      color: trade.type === 'buy' ? '#8b5cf6' : '#F6465D',
+      shape: (trade.type === 'buy' ? 'arrowUp' : 'arrowDown') as 'arrowUp' | 'arrowDown',
+      text: `${trade.type.toUpperCase()} ${trade.amount.toFixed(4)} @ $${trade.price.toFixed(2)}`,
+    }));
 
-      if (candlestickSeriesRef.current) {
-        // Note: markers would need to be collected and set all at once
-        // This is simplified for the example
-      }
-    });
+    // Set all markers at once
+    candlestickSeriesRef.current.setMarkers(markers);
   }, [trades]);
 
   // Load drawings from local storage
@@ -292,9 +295,14 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
   // Handle timeframe change
   const handleTimeframeChange = (tf: Timeframe) => {
     setTimeframe(tf);
-    generateHistoricalData();
+    // Generate will be called by useEffect watching timeframe
     toast.success(`Timeframe changed to ${tf}`);
   };
+
+  // Regenerate data when timeframe or asset changes
+  useEffect(() => {
+    generateHistoricalData();
+  }, [timeframe, asset]);
 
   // Clear all drawings
   const clearDrawings = () => {
