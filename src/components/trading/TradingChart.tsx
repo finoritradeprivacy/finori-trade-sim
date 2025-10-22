@@ -53,6 +53,7 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
   const [showVolume, setShowVolume] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const [lastCandle, setLastCandle] = useState<CandlestickData | null>(null);
+  const [drawingInProgress, setDrawingInProgress] = useState<{ type: DrawingTool; points: Array<{ time: number; price: number }> } | null>(null);
 
   // Initialize chart
   useEffect(() => {
@@ -276,22 +277,7 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
     loadTrades();
   }, [asset]);
 
-  // Draw trade markers on chart
-  useEffect(() => {
-    if (!candlestickSeriesRef.current || trades.length === 0) return;
-
-    // Collect all markers
-    const markers = trades.map(trade => ({
-      time: trade.timestamp as UTCTimestamp,
-      position: (trade.type === 'buy' ? 'belowBar' : 'aboveBar') as 'belowBar' | 'aboveBar',
-      color: trade.type === 'buy' ? '#8b5cf6' : '#F6465D',
-      shape: (trade.type === 'buy' ? 'arrowUp' : 'arrowDown') as 'arrowUp' | 'arrowDown',
-      text: `${trade.type.toUpperCase()} ${trade.amount.toFixed(4)} @ $${trade.price.toFixed(2)}`,
-    }));
-
-    // Set all markers at once
-    candlestickSeriesRef.current.setMarkers(markers);
-  }, [trades]);
+  // Note: Trade markers are now rendered together with drawings in the render drawings effect
 
   // Load drawings from local storage
   useEffect(() => {
@@ -347,8 +333,28 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
           toast.success('Note added');
         }
         setDrawingTool('none');
+      } else if (drawingTool === 'trendline' || drawingTool === 'rectangle') {
+        // Handle two-point drawings
+        if (!drawingInProgress) {
+          // First point
+          setDrawingInProgress({
+            type: drawingTool,
+            points: [newPoint],
+          });
+          toast.info(`Click second point for ${drawingTool}`);
+        } else {
+          // Second point - complete the drawing
+          const newDrawing: Drawing = {
+            id: `${Date.now()}`,
+            type: drawingInProgress.type,
+            points: [...drawingInProgress.points, newPoint],
+          };
+          setDrawings(prev => [...prev, newDrawing]);
+          toast.success(`${drawingTool} added`);
+          setDrawingInProgress(null);
+          setDrawingTool('none');
+        }
       }
-      // For trendline and rectangle, we'd need two points - simplified for now
     };
 
     chartRef.current.subscribeClick(handleClick);
@@ -358,13 +364,17 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
         chartRef.current.unsubscribeClick(handleClick);
       }
     };
-  }, [drawingTool]);
+  }, [drawingTool, drawingInProgress]);
 
   // Render drawings on chart
   useEffect(() => {
-    if (!candlestickSeriesRef.current || drawings.length === 0) return;
+    if (!candlestickSeriesRef.current) return;
 
-    // Create price lines for horizontal drawings
+    // Note: lightweight-charts doesn't natively support diagonal lines
+    // So we'll use markers for trendlines and price lines for rectangles/horizontals
+    
+    const markers: any[] = [];
+
     drawings.forEach(drawing => {
       if (drawing.type === 'horizontal') {
         candlestickSeriesRef.current?.createPriceLine({
@@ -375,9 +385,64 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
           axisLabelVisible: true,
           title: 'Support/Resistance',
         });
+      } else if (drawing.type === 'trendline' && drawing.points.length === 2) {
+        // Determine color based on trend direction
+        const isRising = drawing.points[1].price > drawing.points[0].price;
+        const color = isRising ? '#0ECB81' : '#F6465D';
+        const shape = isRising ? 'arrowUp' : 'arrowDown';
+        
+        // Add markers for start and end points
+        markers.push({
+          time: drawing.points[0].time as UTCTimestamp,
+          position: 'inBar' as 'inBar',
+          color: color,
+          shape: 'circle' as 'circle',
+          text: 'Start',
+        });
+        markers.push({
+          time: drawing.points[1].time as UTCTimestamp,
+          position: 'inBar' as 'inBar',
+          color: color,
+          shape: shape,
+          text: `${isRising ? 'Up' : 'Down'} Trend`,
+        });
+      } else if (drawing.type === 'rectangle' && drawing.points.length === 2) {
+        // Create two horizontal lines for rectangle
+        const highPrice = Math.max(drawing.points[0].price, drawing.points[1].price);
+        const lowPrice = Math.min(drawing.points[0].price, drawing.points[1].price);
+        
+        candlestickSeriesRef.current?.createPriceLine({
+          price: highPrice,
+          color: '#8B5CF6',
+          lineWidth: 2,
+          lineStyle: 0,
+          axisLabelVisible: true,
+          title: 'Zone Top',
+        });
+        candlestickSeriesRef.current?.createPriceLine({
+          price: lowPrice,
+          color: '#8B5CF6',
+          lineWidth: 2,
+          lineStyle: 0,
+          axisLabelVisible: true,
+          title: 'Zone Bottom',
+        });
       }
     });
-  }, [drawings]);
+
+    // Combine with existing trade markers
+    if (markers.length > 0 || trades.length > 0) {
+      const tradeMarkers = trades.map(trade => ({
+        time: trade.timestamp as UTCTimestamp,
+        position: (trade.type === 'buy' ? 'belowBar' : 'aboveBar') as 'belowBar' | 'aboveBar',
+        color: trade.type === 'buy' ? '#8b5cf6' : '#F6465D',
+        shape: (trade.type === 'buy' ? 'arrowUp' : 'arrowDown') as 'arrowUp' | 'arrowDown',
+        text: `${trade.type.toUpperCase()} ${trade.amount.toFixed(4)} @ $${trade.price.toFixed(2)}`,
+      }));
+      
+      candlestickSeriesRef.current.setMarkers([...tradeMarkers, ...markers]);
+    }
+  }, [drawings, trades]);
 
   // Handle timeframe change
   const handleTimeframeChange = (tf: Timeframe) => {
@@ -393,15 +458,25 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
     }
   }, [timeframe, isInitialized]);
 
+  // Remove specific drawing
+  const removeDrawing = (id: string) => {
+    setDrawings(prev => prev.filter(d => d.id !== id));
+    toast.success('Drawing removed');
+  };
+
   // Clear all drawings
   const clearDrawings = () => {
     setDrawings([]);
+    setDrawingInProgress(null);
     toast.success('All drawings cleared');
   };
 
   // Undo last drawing
   const undoDrawing = () => {
-    if (drawings.length > 0) {
+    if (drawingInProgress) {
+      setDrawingInProgress(null);
+      toast.info('Drawing cancelled');
+    } else if (drawings.length > 0) {
       setDrawings(prev => prev.slice(0, -1));
       toast.success('Last drawing removed');
     }
@@ -528,7 +603,25 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
           <div className="flex items-center gap-2 text-[#FCD535]">
             <span className="font-medium">Drawing mode active:</span>
             <span className="capitalize">{drawingTool}</span>
-            <span className="text-[#848E9C]">- Click on the chart to draw</span>
+            <span className="text-[#848E9C]">
+              {drawingInProgress ? '- Click second point' : '- Click on the chart to draw'}
+            </span>
+          </div>
+        )}
+        {drawings.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="font-medium">Drawings ({drawings.length}):</span>
+            {drawings.map(drawing => (
+              <Button
+                key={drawing.id}
+                variant="outline"
+                size="sm"
+                onClick={() => removeDrawing(drawing.id)}
+                className="h-6 px-2 text-xs"
+              >
+                {drawing.type} ×
+              </Button>
+            ))}
           </div>
         )}
         {trades.length > 0 && (
