@@ -60,32 +60,54 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
       width: chartContainerRef.current.clientWidth,
       height: 500,
       layout: {
-        background: { color: 'transparent' },
-        textColor: 'hsl(var(--foreground))',
+        background: { color: '#0B0E11' },
+        textColor: '#B7BDC6',
       },
       grid: {
-        vertLines: { color: 'hsl(var(--border))' },
-        horzLines: { color: 'hsl(var(--border))' },
+        vertLines: { 
+          color: 'rgba(42, 46, 57, 0.5)',
+          style: 1,
+        },
+        horzLines: { 
+          color: 'rgba(42, 46, 57, 0.5)',
+          style: 1,
+        },
       },
       crosshair: {
         mode: 1,
+        vertLine: {
+          width: 1,
+          color: 'rgba(224, 227, 235, 0.1)',
+          style: 3,
+        },
+        horzLine: {
+          width: 1,
+          color: 'rgba(224, 227, 235, 0.1)',
+          style: 3,
+        },
       },
       rightPriceScale: {
-        borderColor: 'hsl(var(--border))',
+        borderColor: 'rgba(42, 46, 57, 0.5)',
+        borderVisible: true,
+        scaleMargins: {
+          top: 0.1,
+          bottom: 0.1,
+        },
       },
       timeScale: {
-        borderColor: 'hsl(var(--border))',
+        borderColor: 'rgba(42, 46, 57, 0.5)',
+        borderVisible: true,
         timeVisible: true,
         secondsVisible: false,
       },
     });
 
     const candlestickSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#10b981',
-      downColor: '#ef4444',
+      upColor: '#0ECB81',
+      downColor: '#F6465D',
       borderVisible: false,
-      wickUpColor: '#10b981',
-      wickDownColor: '#ef4444',
+      wickUpColor: '#0ECB81',
+      wickDownColor: '#F6465D',
     });
 
     chartRef.current = chart;
@@ -291,22 +313,22 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
   const timeframes: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d', '1w'];
 
   return (
-    <Card className="p-4">
+    <Card className="p-0 bg-[#0B0E11] border-[#2A2E39]">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between p-4 border-b border-[#2A2E39]">
         <div className="flex items-center gap-2">
-          <h3 className="text-lg font-semibold">{asset?.symbol || 'BTC'}/USDT</h3>
-          <span className="text-2xl font-bold text-primary">
+          <h3 className="text-lg font-semibold text-[#EAECEF]">{asset?.symbol || 'BTC'}/USDT</h3>
+          <span className="text-2xl font-bold text-[#EAECEF]">
             ${asset?.current_price?.toFixed(2)}
           </span>
-          <span className={`text-sm ${asset?.price_change_24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+          <span className={`text-sm font-medium ${asset?.price_change_24h >= 0 ? 'text-[#0ECB81]' : 'text-[#F6465D]'}`}>
             {asset?.price_change_24h >= 0 ? '+' : ''}{asset?.price_change_24h?.toFixed(2)}%
           </span>
         </div>
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 px-4 pb-3 border-b border-[#2A2E39]">
         {/* Timeframe selector */}
         <div className="flex gap-1">
           {timeframes.map((tf) => (
@@ -404,19 +426,19 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
       <div ref={chartContainerRef} className="w-full" />
 
       {/* Info footer */}
-      <div className="mt-4 text-sm text-muted-foreground">
+      <div className="px-4 py-3 text-sm text-[#848E9C] border-t border-[#2A2E39]">
         {drawingTool !== 'none' && (
-          <div className="flex items-center gap-2 text-primary">
+          <div className="flex items-center gap-2 text-[#FCD535]">
             <span className="font-medium">Drawing mode active:</span>
             <span className="capitalize">{drawingTool}</span>
-            <span className="text-muted-foreground">- Click on the chart to draw</span>
+            <span className="text-[#848E9C]">- Click on the chart to draw</span>
           </div>
         )}
         {trades.length > 0 && (
           <div className="mt-2">
             Showing {trades.length} trades • 
-            <span className="text-purple-500 ml-1">Purple = Buy</span> • 
-            <span className="text-red-500 ml-1">Red = Sell</span>
+            <span className="text-[#8B5CF6] ml-1">Purple = Buy</span> • 
+            <span className="text-[#F6465D] ml-1">Red = Sell</span>
           </div>
         )}
       </div>
