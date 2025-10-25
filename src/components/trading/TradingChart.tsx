@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, Time, UTCTimestamp, CandlestickSeries, LineSeries } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, CandlestickData, Time, UTCTimestamp, CandlestickSeries, LineSeries, createSeriesMarkers } from 'lightweight-charts';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -46,6 +46,7 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
   // Keep references to overlay elements so we can cleanly re-render drawings
   const priceLinesRef = useRef<any[]>([]);
   const trendlineSeriesRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
+  const markersRef = useRef<any>(null);
   
   const [timeframe, setTimeframe] = useState<Timeframe>('1m');
   const [chartType, setChartType] = useState<ChartType>('candlestick');
@@ -479,7 +480,14 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
       text: `${trade.type.toUpperCase()} ${trade.amount.toFixed(4)} @ $${trade.price.toFixed(2)}`,
     }));
 
-    series.setMarkers([...tradeMarkers, ...markers]);
+    const allMarkers = [...tradeMarkers, ...markers];
+    
+    // Use lightweight-charts v5 API for markers
+    if (!markersRef.current) {
+      markersRef.current = createSeriesMarkers(series, allMarkers);
+    } else {
+      markersRef.current.setMarkers(allMarkers);
+    }
   }, [drawings, trades]);
 
   // Handle timeframe change
