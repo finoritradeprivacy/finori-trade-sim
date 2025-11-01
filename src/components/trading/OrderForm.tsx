@@ -62,30 +62,10 @@ const OrderForm = ({ asset }: OrderFormProps) => {
 
       const orderPrice = orderType === "market" ? Number(asset.current_price) : Number(price);
       const orderQuantity = validationResult.data.quantity;
-      const totalCost = orderPrice * orderQuantity;
-
-      const { error: orderError } = await supabase
-        .from("orders")
-        .insert({
-          user_id: user.id,
-          asset_id: asset.id,
-          order_type: orderType,
-          order_subtype: orderSubtype,
-          side: side,
-          quantity: orderQuantity,
-          price: orderType === "limit" || orderType === "stop" ? orderPrice : null,
-          stop_price: orderType === "stop" ? Number(stopPrice) : null,
-          status: orderType === "market" ? "filled" : "pending",
-          filled_quantity: orderType === "market" ? orderQuantity : 0,
-          average_fill_price: orderType === "market" ? orderPrice : 0,
-          filled_at: orderType === "market" ? new Date().toISOString() : null,
-        });
-
-      if (orderError) throw orderError;
 
       if (orderType === "market") {
-        // Use database function for atomic order processing
-        const { data: result, error: rpcError } = await supabase.rpc('process_market_order', {
+        // Use atomic database function for market orders
+        const { data: orderId, error: rpcError } = await supabase.rpc('process_market_order', {
           p_user_id: user.id,
           p_asset_id: asset.id,
           p_side: side,
@@ -105,6 +85,23 @@ const OrderForm = ({ asset }: OrderFormProps) => {
 
         toast.success(`${side === "buy" ? "Bought" : "Sold"} ${orderQuantity} ${asset.symbol}`);
       } else {
+        // For limit/stop orders, insert directly
+        const { error: orderError } = await supabase
+          .from("orders")
+          .insert({
+            user_id: user.id,
+            asset_id: asset.id,
+            order_type: orderType,
+            order_subtype: orderSubtype,
+            side: side,
+            quantity: orderQuantity,
+            price: orderPrice,
+            stop_price: orderType === "stop" ? Number(stopPrice) : null,
+            status: "pending",
+          });
+
+        if (orderError) throw orderError;
+
         const orderTypeLabel = orderType === "stop" ? "Stop" : orderSubtype === "ioc" ? "IOC" : orderSubtype === "fok" ? "FOK" : "Limit";
         toast.success(`${orderTypeLabel} order placed successfully`);
       }
