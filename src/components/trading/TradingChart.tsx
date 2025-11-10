@@ -203,23 +203,26 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
     return map[tf];
   };
 
-  // Real-time price updates
+  // Real-time price updates (subscribe to price_history for selected asset)
   useEffect(() => {
     if (!asset || !candlestickSeriesRef.current) return;
 
     const channel = supabase
-      .channel('asset-price-updates')
+      .channel(`price-history-${asset.id}`)
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
-          table: 'assets',
-          filter: `id=eq.${asset.id}`,
+          table: 'price_history',
+          filter: `asset_id=eq.${asset.id}`,
         },
         (payload) => {
-          const newPrice = payload.new.current_price;
-          updateLastCandle(newPrice);
+          const row: any = payload.new;
+          if (!row) return;
+          const close = Number(row.close);
+          if (!Number.isFinite(close) || close <= 0) return;
+          updateLastCandle(close);
         }
       )
       .subscribe();
@@ -227,7 +230,7 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [asset]);
+  }, [asset, timeframe]);
 
   // Update last candle with new price
   const updateLastCandle = async (newPrice: number) => {
