@@ -207,6 +207,9 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
   useEffect(() => {
     if (!asset || !candlestickSeriesRef.current) return;
 
+    // Always reset last candle to the latest known DB candle to avoid carry-over
+    setLastCandle(null);
+
     const channel = supabase
       .channel(`price-history-${asset.id}`)
       .on(
@@ -220,8 +223,23 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
         (payload) => {
           const row: any = payload.new;
           if (!row) return;
+          // Extra safeguard: ensure event belongs to the current asset
+          if (row.asset_id !== asset.id) {
+            return;
+          }
           const close = Number(row.close);
           if (!Number.isFinite(close) || close <= 0) return;
+
+          // Ignore obviously wrong ticks (>30% away from current known price)
+          const baseline = Number(asset.current_price);
+          if (Number.isFinite(baseline) && baseline > 0) {
+            const diff = Math.abs(close - baseline) / baseline;
+            if (diff > 0.3) {
+              console.warn('Ignored outlier tick', { close, baseline, asset: asset.symbol, row });
+              return;
+            }
+          }
+
           updateLastCandle(close);
         }
       )
@@ -246,7 +264,7 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
       console.warn('Ignoring invalid price update', newPrice);
       return;
     }
-    const MAX_JUMP = 0.2; // 20% max jump per tick to avoid spikes from bad payloads
+    const MAX_JUMP = 0.1; // 10% max jump per tick to avoid spikes from bad payloads
     const price = prevClose && Math.abs(newPrice - prevClose) / prevClose > MAX_JUMP
       ? prevClose
       : newPrice;
@@ -545,6 +563,7 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
   // Generate historical data when asset changes, timeframe changes, or chart initializes
   useEffect(() => {
     if (isInitialized && asset) {
+      // Ensure lastCandle aligns with freshly loaded data for this asset
       generateHistoricalData();
     }
   }, [timeframe, isInitialized, asset?.id]);
