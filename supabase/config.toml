@@ -1,1 +1,7 @@
 project_id = "agsgsdjobfpodjneknpm"
+
+[functions.update-asset-prices]
+verify_jwt = true
+
+[functions.generate-news]
+verify_jwt = false

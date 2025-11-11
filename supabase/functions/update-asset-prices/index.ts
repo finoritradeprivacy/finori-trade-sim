@@ -51,47 +51,55 @@ Deno.serve(async (req) => {
 
     if (assetsError) throw assetsError;
 
-    // Get recent news events (last 60 seconds)
-    const sixtySecondsAgo = new Date(Date.now() - 60000).toISOString();
-    const { data: recentNews, error: newsError } = await supabase
+    // Get news events that are ready to trigger (scheduled_for <= now and not yet processed)
+    const now = new Date().toISOString();
+    const { data: triggeredNews, error: newsError } = await supabase
       .from('news_events')
       .select('*')
-      .gte('created_at', sixtySecondsAgo);
+      .lte('scheduled_for', now)
+      .is('scheduled_for', null); // Only get pending news (not yet processed)
 
     if (newsError) throw newsError;
 
-    console.log(`Updating ${assets?.length || 0} assets, ${recentNews?.length || 0} recent news`);
+    console.log(`Updating ${assets?.length || 0} assets, ${triggeredNews?.length || 0} triggered news`);
 
-    // Update each asset
+    // Process triggered news events
+    for (const news of triggeredNews || []) {
+      if (news.asset_id) {
+        const impactStrength = Number(news.impact_strength);
+        const changePercent = news.impact_type === 'bullish' ? impactStrength : -impactStrength;
+        
+        const asset = assets?.find(a => a.id === news.asset_id);
+        if (asset) {
+          const currentPrice = Number(asset.current_price);
+          const newPrice = currentPrice * (1 + changePercent / 100);
+          
+          // Update asset price immediately
+          await supabase
+            .from('assets')
+            .update({
+              current_price: newPrice,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', asset.id);
+          
+          console.log(`Applied news to ${asset.symbol}: ${changePercent.toFixed(2)}%`);
+        }
+        
+        // Mark news as processed by clearing scheduled_for
+        await supabase
+          .from('news_events')
+          .update({ scheduled_for: null })
+          .eq('id', news.id);
+      }
+    }
+
+    // Update each asset with normal fluctuations
     for (const asset of assets || []) {
       let priceChange = 0;
       
-      // Check if there's news affecting this asset
-      const assetNews = recentNews?.filter(news => 
-        !news.asset_id || news.asset_id === asset.id
-      ) || [];
-
-      if (assetNews.length > 0) {
-        // Apply news-based changes
-        for (const news of assetNews) {
-          const impactMultiplier = Number(news.impact_strength) || 0.5;
-          let changePercent = 0;
-
-          if (news.impact_type === 'bullish') {
-            changePercent = (Math.random() * 3 + 2) * impactMultiplier; // +2% to +5%
-          } else if (news.impact_type === 'bearish') {
-            changePercent = -(Math.random() * 3 + 2) * impactMultiplier; // -2% to -5%
-          } else {
-            changePercent = (Math.random() - 0.5) * 2 * impactMultiplier; // -1% to +1%
-          }
-
-          priceChange += changePercent;
-        }
-        console.log(`Asset ${asset.symbol}: News impact ${priceChange.toFixed(2)}%`);
-      } else {
-        // Normal small random fluctuation
-        priceChange = (Math.random() - 0.5) * 1.5; // -0.75% to +0.75%
-      }
+      // Normal small random fluctuation
+      priceChange = (Math.random() - 0.5) * 0.5; // -0.25% to +0.25%
 
       // Calculate new price
       const currentPrice = Number(asset.current_price);
@@ -165,7 +173,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         updated: assets?.length || 0,
-        newsProcessed: recentNews?.length || 0 
+        newsProcessed: triggeredNews?.length || 0 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
