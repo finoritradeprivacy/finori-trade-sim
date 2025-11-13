@@ -48,7 +48,7 @@ export const Challenges = () => {
       const today = new Date().toISOString().split('T')[0];
       
       const { data: dailyChallenges } = await supabase
-        .from('daily_challenges')
+        .from('daily_challenges' as any)
         .select(`
           id,
           challenges (
@@ -65,7 +65,7 @@ export const Challenges = () => {
         const challengesWithProgress = await Promise.all(
           dailyChallenges.map(async (dc: any) => {
             const { data: progress } = await supabase
-              .from('user_challenge_progress')
+              .from('user_challenge_progress' as any)
               .select('current_value, completed')
               .eq('user_id', user!.id)
               .eq('daily_challenge_id', dc.id)
@@ -74,8 +74,8 @@ export const Challenges = () => {
             return {
               id: dc.id,
               ...dc.challenges,
-              current_value: progress?.current_value || 0,
-              completed: progress?.completed || false
+              current_value: (progress as any)?.current_value || 0,
+              completed: (progress as any)?.completed || false
             };
           })
         );
@@ -113,14 +113,14 @@ export const Challenges = () => {
 
       // Generate week status
       const { data: streakData } = await supabase
-        .from('user_daily_streak')
+        .from('user_daily_streak' as any)
         .select('streak_history')
         .eq('user_id', user!.id)
         .single();
 
       if (streakData) {
         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        const history = Array.isArray(streakData.streak_history) ? streakData.streak_history : [];
+        const history = Array.isArray((streakData as any).streak_history) ? (streakData as any).streak_history : [];
         const today = new Date();
         const currentDay = today.getDay();
         const mondayOffset = currentDay === 0 ? 6 : currentDay - 1;
