@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.generate-news]
 verify_jwt = false
+
+[functions.manage-daily-challenges]
+verify_jwt = false
