@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown, Bitcoin, LineChart, DollarSign, MoreVertical, Newspaper } from "lucide-react";
+import { TrendingUp, TrendingDown, Bitcoin, LineChart, DollarSign, MoreVertical, Newspaper, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import AssetsOverviewDialog from "./AssetsOverviewDialog";
+import { Challenges } from "./Challenges";
 
 interface AssetSelectorProps {
   assets: any[];
@@ -13,7 +14,7 @@ interface AssetSelectorProps {
 }
 
 const AssetSelector = ({ assets, selectedAsset, onSelectAsset }: AssetSelectorProps) => {
-  const [selectedCategory, setSelectedCategory] = useState<'crypto' | 'stocks' | 'forex' | 'news'>('crypto');
+  const [selectedCategory, setSelectedCategory] = useState<'crypto' | 'stocks' | 'forex' | 'news' | 'challenges'>('crypto');
   const [showOverview, setShowOverview] = useState(false);
   const [pendingNews, setPendingNews] = useState<any[]>([]);
   const [, setTick] = useState(0);
@@ -53,7 +54,7 @@ const AssetSelector = ({ assets, selectedAsset, onSelectAsset }: AssetSelectorPr
     };
   }, []);
 
-  const filteredAssets = selectedCategory === 'news' 
+  const filteredAssets = (selectedCategory === 'news' || selectedCategory === 'challenges')
     ? [] 
     : assets.filter(asset => asset.category === selectedCategory);
 
@@ -62,6 +63,7 @@ const AssetSelector = ({ assets, selectedAsset, onSelectAsset }: AssetSelectorPr
     { id: 'stocks' as const, label: 'Stocks', icon: LineChart },
     { id: 'forex' as const, label: 'Forex', icon: DollarSign },
     { id: 'news' as const, label: 'News', icon: Newspaper },
+    { id: 'challenges' as const, label: 'Challenges', icon: Trophy },
   ];
 
   const getCountdown = (scheduledFor: string) => {
@@ -108,7 +110,11 @@ const AssetSelector = ({ assets, selectedAsset, onSelectAsset }: AssetSelectorPr
         </div>
       
       <div className="flex gap-3 overflow-x-auto pb-2">
-          {selectedCategory === 'news' ? (
+          {selectedCategory === 'challenges' ? (
+            <div className="w-full">
+              <Challenges />
+            </div>
+          ) : selectedCategory === 'news' ? (
             pendingNews.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 w-full text-center">
                 No pending news events
