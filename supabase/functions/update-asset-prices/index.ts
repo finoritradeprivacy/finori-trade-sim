@@ -13,24 +13,44 @@ Deno.serve(async (req) => {
   try {
     console.log('Starting price update cycle...');
     
-    // Verify HMAC signature from cron job
-    const signature = req.headers.get('X-Cron-Signature');
-    const secret = Deno.env.get('CRON_SECRET');
-    
-    if (signature !== secret) {
+    // Verify cron signature using env or DB fallback
+    const signature = req.headers.get('X-Cron-Signature') || '';
+    const envSecret = Deno.env.get('CRON_SECRET') || '';
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    let dbSecret: string | null = null;
+    try {
+      const { data: cfg, error: cfgError } = await supabase
+        .from('system_config')
+        .select('value')
+        .eq('key', 'cron_secret')
+        .maybeSingle();
+      if (!cfgError) {
+        dbSecret = (cfg as any)?.value ?? null;
+      } else {
+        console.error('Error loading cron secret from DB:', cfgError);
+      }
+    } catch (e) {
+      console.error('Exception loading cron secret from DB:', e);
+    }
+
+    const validSignature =
+      !!signature &&
+      ((envSecret && signature === envSecret) || (dbSecret && signature === dbSecret));
+
+    if (!validSignature) {
       console.error('Unauthorized: Invalid or missing cron signature');
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
-        { 
+        {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get all active assets
     const { data: assets, error: assetsError } = await supabase
