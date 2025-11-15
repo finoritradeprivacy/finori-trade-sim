@@ -62,6 +62,68 @@ export type Database = {
         }
         Relationships: []
       }
+      challenges: {
+        Row: {
+          challenge_type: Database["public"]["Enums"]["challenge_type"]
+          created_at: string
+          description: string
+          id: string
+          reward_usdt: number
+          reward_xp: number
+          target_value: number
+          title: string
+        }
+        Insert: {
+          challenge_type: Database["public"]["Enums"]["challenge_type"]
+          created_at?: string
+          description: string
+          id?: string
+          reward_usdt: number
+          reward_xp: number
+          target_value?: number
+          title: string
+        }
+        Update: {
+          challenge_type?: Database["public"]["Enums"]["challenge_type"]
+          created_at?: string
+          description?: string
+          id?: string
+          reward_usdt?: number
+          reward_xp?: number
+          target_value?: number
+          title?: string
+        }
+        Relationships: []
+      }
+      daily_challenges: {
+        Row: {
+          challenge_date: string
+          challenge_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          challenge_date: string
+          challenge_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          challenge_date?: string
+          challenge_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_challenges_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       news_events: {
         Row: {
           asset_id: string | null
@@ -433,6 +495,74 @@ export type Database = {
           },
         ]
       }
+      user_challenge_progress: {
+        Row: {
+          completed: boolean
+          completed_at: string | null
+          created_at: string
+          current_value: number
+          daily_challenge_id: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          current_value?: number
+          daily_challenge_id: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          current_value?: number
+          daily_challenge_id?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_challenge_progress_daily_challenge_id_fkey"
+            columns: ["daily_challenge_id"]
+            isOneToOne: false
+            referencedRelation: "daily_challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_daily_streak: {
+        Row: {
+          created_at: string
+          current_streak: number
+          last_login_date: string
+          streak_history: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_streak?: number
+          last_login_date: string
+          streak_history?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_streak?: number
+          last_login_date?: string
+          streak_history?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -446,6 +576,14 @@ export type Database = {
         Args: { target_level: number }
         Returns: number
       }
+      increment_balance: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: undefined
+      }
+      increment_xp: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: undefined
+      }
       process_market_order: {
         Args: {
           p_asset_id: string
@@ -458,7 +596,30 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      challenge_type:
+        | "trades_count"
+        | "profit_percentage"
+        | "portfolio_diversity"
+        | "consecutive_profits"
+        | "small_loss"
+        | "trend_lines"
+        | "loss_then_profit"
+        | "news_reactions"
+        | "night_trade"
+        | "portfolio_size"
+        | "trade_value"
+        | "trades_in_hour"
+        | "holding_time"
+        | "multi_market"
+        | "timeframe_views"
+        | "chart_note"
+        | "active_time"
+        | "quick_profit"
+        | "news_trade"
+        | "quick_trades"
+        | "daily_xp"
+        | "no_losses"
+        | "timeframe_changes"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -585,6 +746,32 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      challenge_type: [
+        "trades_count",
+        "profit_percentage",
+        "portfolio_diversity",
+        "consecutive_profits",
+        "small_loss",
+        "trend_lines",
+        "loss_then_profit",
+        "news_reactions",
+        "night_trade",
+        "portfolio_size",
+        "trade_value",
+        "trades_in_hour",
+        "holding_time",
+        "multi_market",
+        "timeframe_views",
+        "chart_note",
+        "active_time",
+        "quick_profit",
+        "news_trade",
+        "quick_trades",
+        "daily_xp",
+        "no_losses",
+        "timeframe_changes",
+      ],
+    },
   },
 } as const
