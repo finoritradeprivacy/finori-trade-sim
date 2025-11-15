@@ -399,6 +399,27 @@ export type Database = {
         }
         Relationships: []
       }
+      system_config: {
+        Row: {
+          created_at: string | null
+          key: string
+          updated_at: string | null
+          value: string
+        }
+        Insert: {
+          created_at?: string | null
+          key: string
+          updated_at?: string | null
+          value: string
+        }
+        Update: {
+          created_at?: string | null
+          key?: string
+          updated_at?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
       trades: {
         Row: {
           asset_id: string
@@ -576,6 +597,7 @@ export type Database = {
         Args: { target_level: number }
         Returns: number
       }
+      get_config: { Args: { p_key: string }; Returns: string }
       increment_balance: {
         Args: { p_amount: number; p_user_id: string }
         Returns: undefined
