@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TrendingUp, TrendingDown, Award, DollarSign, Clock, Target, LogOut, RotateCcw, Trash2, UserPlus, Camera, ArrowLeft, Copy, Check } from "lucide-react";
+import { TrendingUp, TrendingDown, Award, DollarSign, Clock, Target, LogOut, RotateCcw, Trash2, UserPlus, Camera, ArrowLeft, Copy, Check, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Portfolio from "@/components/trading/Portfolio";
 
@@ -38,7 +38,10 @@ const Profile = () => {
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showAvatarDialog, setShowAvatarDialog] = useState(false);
+  const [showEditProfileDialog, setShowEditProfileDialog] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [editNickname, setEditNickname] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -187,6 +190,54 @@ const Profile = () => {
     }
   };
 
+  const handleUpdateProfile = async () => {
+    if (!user) return;
+    
+    if (editNickname.length < 3) {
+      toast({
+        title: "Error",
+        description: "Nickname must be at least 3 characters",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Update nickname in profiles
+      await supabase.from("profiles").update({
+        nickname: editNickname,
+        email: editEmail
+      }).eq("id", user.id);
+
+      // Update email in auth if changed
+      if (editEmail !== profileData?.email) {
+        const { error } = await supabase.auth.updateUser({
+          email: editEmail
+        });
+        if (error) {
+          toast({
+            title: "Email Update",
+            description: "A confirmation email has been sent to your new email address",
+          });
+        }
+      }
+
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been updated successfully"
+      });
+      setShowEditProfileDialog(false);
+      fetchProfileData();
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update profile",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleInviteFriend = async () => {
     const referralLink = `${window.location.origin}/auth?ref=${user?.id}`;
     try {
@@ -305,6 +356,14 @@ const Profile = () => {
             </div>
 
             <div className="flex flex-col gap-2">
+              <Button variant="outline" className="w-full" onClick={() => {
+                setEditNickname(profileData.nickname);
+                setEditEmail(profileData.email);
+                setShowEditProfileDialog(true);
+              }}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit Profile
+              </Button>
               <Button variant="outline" className="w-full" onClick={() => setShowAvatarDialog(true)}>
                 <Camera className="h-4 w-4 mr-2" />
                 Change Avatar
@@ -528,6 +587,45 @@ const Profile = () => {
             )}
             <Button onClick={handleUpdateAvatar} className="w-full">
               Save
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={showEditProfileDialog} onOpenChange={setShowEditProfileDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Profile</DialogTitle>
+            <DialogDescription>
+              Update your nickname and email address
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-nickname">Nickname</Label>
+              <Input
+                id="edit-nickname"
+                value={editNickname}
+                onChange={(e) => setEditNickname(e.target.value)}
+                placeholder="Your nickname"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-email">Email</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                placeholder="your@email.com"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Changing your email will require confirmation
+              </p>
+            </div>
+            <Button onClick={handleUpdateProfile} className="w-full">
+              Save Changes
             </Button>
           </div>
         </DialogContent>
