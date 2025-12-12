@@ -12,9 +12,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TrendingUp, TrendingDown, Award, DollarSign, Clock, Target, LogOut, RotateCcw, Trash2, UserPlus, Camera, ArrowLeft, Copy, Check, Pencil } from "lucide-react";
+import { TrendingUp, TrendingDown, Award, DollarSign, Clock, Target, LogOut, RotateCcw, Trash2, UserPlus, Camera, ArrowLeft, Copy, Check, Pencil, AlertTriangle, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Portfolio from "@/components/trading/Portfolio";
+import { toast as sonnerToast } from "sonner";
 
 interface ProfileData {
   nickname: string;
@@ -43,6 +44,8 @@ const Profile = () => {
   const [editNickname, setEditNickname] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [copied, setCopied] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(true);
+  const [resendingEmail, setResendingEmail] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -50,6 +53,7 @@ const Profile = () => {
       return;
     }
     fetchProfileData();
+    setEmailVerified(user.email_confirmed_at !== null);
 
     // Track played time
     const interval = setInterval(() => {
@@ -263,6 +267,26 @@ const Profile = () => {
     return `${hours}h ${minutes}m`;
   };
 
+  const handleResendVerificationEmail = async () => {
+    if (!user?.email) return;
+    setResendingEmail(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: user.email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`
+        }
+      });
+      if (error) throw error;
+      sonnerToast.success("Verification email sent! Please check your inbox.");
+    } catch (error: any) {
+      sonnerToast.error(error.message || "Failed to resend verification email");
+    } finally {
+      setResendingEmail(false);
+    }
+  };
+
   const calculateXpForNextLevel = () => {
     if (!profileData) return { current: 0, needed: 1000, percentage: 0 };
 
@@ -303,6 +327,30 @@ const Profile = () => {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Trading
         </Button>
+
+        {/* Email Verification Warning */}
+        {!emailVerified && (
+          <Card className="mb-6 p-4 bg-yellow-500/20 border-yellow-500/50">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-yellow-500">Please confirm your email</p>
+                  <p className="text-sm text-muted-foreground">You won't be able to trade until you verify your email address.</p>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                className="border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10"
+                onClick={handleResendVerificationEmail}
+                disabled={resendingEmail}
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                {resendingEmail ? "Sending..." : "Resend Email"}
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {/* Profile Header */}
         <Card className="p-6 mb-6">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { z } from "zod";
+import { AlertTriangle } from "lucide-react";
+import { useAdmin } from "@/hooks/useAdmin";
 
 const orderSchema = z.object({
   quantity: z.number()
@@ -33,6 +35,7 @@ interface OrderFormProps {
 
 const OrderForm = ({ asset }: OrderFormProps) => {
   const { user } = useAuth();
+  const { isAdmin } = useAdmin();
   const [orderType, setOrderType] = useState("market");
   const [orderSubtype, setOrderSubtype] = useState("standard");
   const [side, setSide] = useState<"buy" | "sell">("buy");
@@ -40,9 +43,23 @@ const OrderForm = ({ asset }: OrderFormProps) => {
   const [price, setPrice] = useState("");
   const [stopPrice, setStopPrice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      // Check if email is confirmed
+      setEmailVerified(user.email_confirmed_at !== null);
+    }
+  }, [user]);
 
   const handleSubmitOrder = async () => {
     if (!user || !asset) return;
+
+    // Block trading if email not verified (except admins)
+    if (!emailVerified && !isAdmin) {
+      toast.error("Please verify your email before trading");
+      return;
+    }
 
     setLoading(true);
 
@@ -117,6 +134,21 @@ const OrderForm = ({ asset }: OrderFormProps) => {
   };
 
   if (!asset) return null;
+
+  // Show warning if email not verified
+  if (!emailVerified && !isAdmin) {
+    return (
+      <Card className="p-4">
+        <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0" />
+          <div>
+            <p className="font-medium text-yellow-500">Email Not Verified</p>
+            <p className="text-sm text-muted-foreground">Please verify your email to start trading.</p>
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-4">
