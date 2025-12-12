@@ -93,6 +93,8 @@ const OrderForm = ({ asset }: OrderFormProps) => {
         if (rpcError) {
           if (rpcError.message.includes('Insufficient balance')) {
             toast.error("Insufficient balance");
+          } else if (rpcError.message.includes('Insufficient portfolio')) {
+            toast.error("You don't own enough of this asset to sell");
           } else {
             throw rpcError;
           }

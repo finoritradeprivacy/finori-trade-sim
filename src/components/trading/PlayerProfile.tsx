@@ -120,8 +120,20 @@ const PlayerProfile = () => {
     );
   }
 
-  const xpForNextLevel = playerData.level * 1000;
-  const xpProgress = (playerData.total_xp % 1000) / 10;
+  // XP formula: Level 1 = 1000 XP, then +500 XP per level (1000, 1500, 2000, 2500...)
+  const calculateXpForLevel = (level: number): number => {
+    if (level <= 1) return 0;
+    let total = 0;
+    for (let i = 1; i < level; i++) {
+      total += 1000 + (i - 1) * 500;
+    }
+    return total;
+  };
+  
+  const xpForCurrentLevel = calculateXpForLevel(playerData.level);
+  const xpForNextLevel = 1000 + (playerData.level - 1) * 500;
+  const xpInCurrentLevel = playerData.total_xp - xpForCurrentLevel;
+  const xpProgress = Math.min(100, (xpInCurrentLevel / xpForNextLevel) * 100);
   const isProfitable = playerData.total_profit_loss >= 0;
 
   return (
@@ -145,7 +157,7 @@ const PlayerProfile = () => {
           
           <div className="space-y-1">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>XP: {playerData.total_xp % 1000} / 1000</span>
+              <span>XP: {xpInCurrentLevel} / {xpForNextLevel}</span>
               <span>{xpProgress.toFixed(0)}%</span>
             </div>
             <Progress value={xpProgress} className="h-1.5" />
