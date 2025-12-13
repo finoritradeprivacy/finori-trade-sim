@@ -165,7 +165,7 @@ export const Challenges = () => {
   }
 
   return (
-    <div className="p-4 space-y-4 max-h-[600px] overflow-y-auto">
+    <div className="space-y-4 max-h-[600px] overflow-y-auto w-full">
       {/* Daily Streak */}
       <Card className="p-6 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
         <div className="flex items-center justify-between mb-4">
