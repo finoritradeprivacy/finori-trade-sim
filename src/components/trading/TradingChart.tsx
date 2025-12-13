@@ -273,8 +273,16 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
           if (row.asset_id !== asset.id) {
             return;
           }
+          
+          // Extract full OHLC data from the database record
+          const open = Number(row.open);
+          const high = Number(row.high);
+          const low = Number(row.low);
           const close = Number(row.close);
+          const time = Number(row.time);
+          
           if (!Number.isFinite(close) || close <= 0) return;
+          if (!Number.isFinite(time) || time <= 0) return;
 
           // Ignore obviously wrong ticks (>30% away from current known price)
           const baseline = Number(asset.current_price);
@@ -286,7 +294,13 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
             }
           }
 
-          updateLastCandle(close);
+          updateCandleFromDb({
+            time,
+            open,
+            high,
+            low,
+            close,
+          });
         }
       )
       .subscribe();
@@ -296,54 +310,44 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
     };
   }, [asset, timeframe]);
 
-  // Update last candle with new price
-  const updateLastCandle = async (newPrice: number) => {
+  // Update candle from database record with full OHLC data
+  const updateCandleFromDb = (dbCandle: { time: number; open: number; high: number; low: number; close: number }) => {
     if (!candlestickSeriesRef.current || !asset) return;
 
     // Get current timeframe interval
     const timeframeSeconds = getTimeframeSeconds(timeframe);
-    const now = Math.floor(Date.now() / 1000);
 
-    // Sanity check and glitch filter
-    const prevClose = lastCandle?.close ?? Number(asset.current_price);
-    if (!Number.isFinite(newPrice) || newPrice <= 0) {
-      console.warn('Ignoring invalid price update', newPrice);
+    // Calculate the bucket time for this candle based on current timeframe
+    const bucketTime = Math.floor(dbCandle.time / timeframeSeconds) * timeframeSeconds as UTCTimestamp;
+
+    // Sanity check
+    if (!Number.isFinite(dbCandle.close) || dbCandle.close <= 0) {
+      console.warn('Ignoring invalid candle', dbCandle);
       return;
     }
-    const MAX_JUMP = 0.1; // 10% max jump per tick to avoid spikes from bad payloads
-    const price = prevClose && Math.abs(newPrice - prevClose) / prevClose > MAX_JUMP
-      ? prevClose
-      : newPrice;
-    
-    // Calculate the start time of the current candle
-    const currentCandleTime = Math.floor(now / timeframeSeconds) * timeframeSeconds as UTCTimestamp;
-    
-    // If we have a last candle and it's the same time, update it
-    if (lastCandle && lastCandle.time === currentCandleTime) {
+
+    // If we have a last candle in the same bucket, merge with it
+    if (lastCandle && lastCandle.time === bucketTime) {
       const updatedCandle: CandlestickData = {
-        time: currentCandleTime,
-        open: lastCandle.open,
-        high: Math.max(lastCandle.high, price),
-        low: Math.min(lastCandle.low, price),
-        close: price,
+        time: bucketTime,
+        open: lastCandle.open, // Keep original open
+        high: Math.max(lastCandle.high, dbCandle.high),
+        low: Math.min(lastCandle.low, dbCandle.low),
+        close: dbCandle.close, // Latest close
       };
       candlestickSeriesRef.current.update(updatedCandle);
       setLastCandle(updatedCandle);
-
-      // Skipping client-side DB upsert to respect RLS; history is maintained server-side
     } else {
-      // New candle period
+      // New candle bucket - use full OHLC from the database record
       const newCandle: CandlestickData = {
-        time: currentCandleTime,
-        open: price,
-        high: price,
-        low: price,
-        close: price,
+        time: bucketTime,
+        open: dbCandle.open,
+        high: dbCandle.high,
+        low: dbCandle.low,
+        close: dbCandle.close,
       };
       candlestickSeriesRef.current.update(newCandle);
       setLastCandle(newCandle);
-
-      // Skipping client-side DB insert to respect RLS; history is maintained server-side
     }
   };
 
