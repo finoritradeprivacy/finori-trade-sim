@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { TrendingUp, Shield, Zap, Eye, EyeOff } from "lucide-react";
+import { TrendingUp, Shield, Zap, Eye, EyeOff, Check, X } from "lucide-react";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
@@ -38,6 +38,16 @@ const Auth = () => {
     }
   }, [user, navigate, searchParams]);
 
+  const passwordRequirements = useMemo(() => ({
+    hasMinLength: password.length >= 8,
+    hasLowercase: /[a-z]/.test(password),
+    hasUppercase: /[A-Z]/.test(password),
+    hasDigit: /[0-9]/.test(password),
+    hasSymbol: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+  }), [password]);
+
+  const isPasswordValid = Object.values(passwordRequirements).every(Boolean);
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -46,8 +56,8 @@ const Auth = () => {
       return;
     }
 
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    if (!isPasswordValid) {
+      toast.error("Password doesn't meet all requirements");
       return;
     }
 
@@ -396,6 +406,33 @@ const Auth = () => {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
+                  {password && (
+                    <div className="mt-2 space-y-1 text-xs">
+                      <p className="text-muted-foreground font-medium mb-1">Password must contain:</p>
+                      <div className="grid grid-cols-2 gap-1">
+                        <div className={`flex items-center gap-1 ${passwordRequirements.hasMinLength ? 'text-profit' : 'text-muted-foreground'}`}>
+                          {passwordRequirements.hasMinLength ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                          <span>8+ characters</span>
+                        </div>
+                        <div className={`flex items-center gap-1 ${passwordRequirements.hasLowercase ? 'text-profit' : 'text-muted-foreground'}`}>
+                          {passwordRequirements.hasLowercase ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                          <span>Lowercase (a-z)</span>
+                        </div>
+                        <div className={`flex items-center gap-1 ${passwordRequirements.hasUppercase ? 'text-profit' : 'text-muted-foreground'}`}>
+                          {passwordRequirements.hasUppercase ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                          <span>Uppercase (A-Z)</span>
+                        </div>
+                        <div className={`flex items-center gap-1 ${passwordRequirements.hasDigit ? 'text-profit' : 'text-muted-foreground'}`}>
+                          {passwordRequirements.hasDigit ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                          <span>Digit (0-9)</span>
+                        </div>
+                        <div className={`flex items-center gap-1 ${passwordRequirements.hasSymbol ? 'text-profit' : 'text-muted-foreground'}`}>
+                          {passwordRequirements.hasSymbol ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                          <span>Symbol (!@#$...)</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
