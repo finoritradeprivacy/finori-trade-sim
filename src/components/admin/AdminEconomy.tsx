@@ -194,22 +194,27 @@ export const AdminEconomy = () => {
         .single();
 
       const newLevel = Math.max(1, (currentStats?.level || 1) + change);
-      // Calculate XP needed for new level (simplified)
-      const newXp = newLevel * 1000;
+      
+      // Get the correct XP needed for the target level using the database function
+      const { data: xpData } = await supabase.rpc('calculate_total_xp_for_level', {
+        target_level: newLevel
+      });
+      
+      const newXp = xpData || 0;
 
       await supabase
         .from('player_stats')
-        .update({ level: newLevel, total_xp: newXp })
+        .update({ total_xp: newXp })
         .eq('user_id', selectedUserId);
 
       await supabase.rpc('log_admin_action', {
         p_action_type: 'modify_level',
         p_entity_type: 'user',
         p_entity_id: selectedUserId,
-        p_details: { change, new_level: newLevel }
+        p_details: { old_level: currentStats?.level, new_level: newLevel, new_xp: newXp }
       });
 
-      toast.success(`Level ${modifyType === 'add' ? 'increased' : 'decreased'} by ${amount}`);
+      toast.success(`Level changed from ${currentStats?.level || 1} to ${newLevel}`);
       setShowModifyLevelDialog(false);
       setModifyAmount('');
       fetchData();
