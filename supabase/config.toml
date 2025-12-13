@@ -8,3 +8,6 @@ verify_jwt = true
 
 [functions.manage-daily-challenges]
 verify_jwt = true
+
+[functions.process-dividends]
+verify_jwt = false

@@ -68,6 +68,7 @@ export type Database = {
           created_at: string
           current_price: number
           description: string | null
+          dividend_yield: number | null
           id: string
           is_active: boolean | null
           market_cap: number | null
@@ -83,6 +84,7 @@ export type Database = {
           created_at?: string
           current_price: number
           description?: string | null
+          dividend_yield?: number | null
           id?: string
           is_active?: boolean | null
           market_cap?: number | null
@@ -98,6 +100,7 @@ export type Database = {
           created_at?: string
           current_price?: number
           description?: string | null
+          dividend_yield?: number | null
           id?: string
           is_active?: boolean | null
           market_cap?: number | null
@@ -214,6 +217,86 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      dividend_payments: {
+        Row: {
+          asset_id: string
+          created_at: string
+          dividend_amount: number
+          dividend_yield: number
+          id: string
+          payment_date: string
+          price_at_calculation: number
+          shares_held: number
+          snapshot_id: string | null
+          user_id: string
+        }
+        Insert: {
+          asset_id: string
+          created_at?: string
+          dividend_amount: number
+          dividend_yield: number
+          id?: string
+          payment_date: string
+          price_at_calculation: number
+          shares_held: number
+          snapshot_id?: string | null
+          user_id: string
+        }
+        Update: {
+          asset_id?: string
+          created_at?: string
+          dividend_amount?: number
+          dividend_yield?: number
+          id?: string
+          payment_date?: string
+          price_at_calculation?: number
+          shares_held?: number
+          snapshot_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dividend_payments_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "dividend_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dividend_snapshots: {
+        Row: {
+          asset_id: string
+          created_at: string
+          dividend_yield_at_snapshot: number
+          id: string
+          price_at_snapshot: number
+          quantity: number
+          snapshot_date: string
+          user_id: string
+        }
+        Insert: {
+          asset_id: string
+          created_at?: string
+          dividend_yield_at_snapshot: number
+          id?: string
+          price_at_snapshot: number
+          quantity: number
+          snapshot_date: string
+          user_id: string
+        }
+        Update: {
+          asset_id?: string
+          created_at?: string
+          dividend_yield_at_snapshot?: number
+          id?: string
+          price_at_snapshot?: number
+          quantity?: number
+          snapshot_date?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       ip_blocklist: {
         Row: {
@@ -928,6 +1011,39 @@ export type Database = {
           last_login_date?: string
           streak_history?: Json
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean | null
+          message: string
+          metadata: Json | null
+          notification_type: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message: string
+          metadata?: Json | null
+          notification_type: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          metadata?: Json | null
+          notification_type?: string
+          title?: string
           user_id?: string
         }
         Relationships: []
