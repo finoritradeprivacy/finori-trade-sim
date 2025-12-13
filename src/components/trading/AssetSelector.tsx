@@ -56,7 +56,7 @@ const AssetSelector = ({ assets, selectedAsset, onSelectAsset }: AssetSelectorPr
 
   const filteredAssets = (selectedCategory === 'news' || selectedCategory === 'challenges')
     ? [] 
-    : assets.filter(asset => asset.category === selectedCategory);
+    : assets.filter(asset => asset.category === selectedCategory).slice(0, 7);
 
   const categories = [
     { id: 'crypto' as const, label: 'Crypto', icon: Bitcoin },
