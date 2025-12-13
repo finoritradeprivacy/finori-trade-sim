@@ -185,6 +185,11 @@ export const AdminEconomy = () => {
 
     try {
       const amount = parseInt(modifyAmount);
+      if (isNaN(amount) || amount <= 0) {
+        toast.error('Please enter a valid positive number');
+        return;
+      }
+      
       const change = modifyType === 'add' ? amount : -amount;
 
       const { data: currentStats } = await supabase
@@ -193,28 +198,46 @@ export const AdminEconomy = () => {
         .eq('user_id', selectedUserId)
         .single();
 
-      const newLevel = Math.max(1, (currentStats?.level || 1) + change);
+      const currentLevel = currentStats?.level || 1;
+      const newLevel = Math.max(1, Math.min(20000, currentLevel + change));
       
       // Get the correct XP needed for the target level using the database function
-      const { data: xpData } = await supabase.rpc('calculate_total_xp_for_level', {
+      const { data: xpData, error: xpError } = await supabase.rpc('calculate_total_xp_for_level', {
         target_level: newLevel
       });
       
+      if (xpError) {
+        console.error('Error calculating XP:', xpError);
+        toast.error('Failed to calculate XP for level');
+        return;
+      }
+      
       const newXp = xpData || 0;
+      
+      if (newXp === 0 && newLevel > 1) {
+        toast.error('Failed to calculate XP - please try a smaller level change');
+        return;
+      }
 
-      await supabase
+      const { error: updateError } = await supabase
         .from('player_stats')
         .update({ total_xp: newXp })
         .eq('user_id', selectedUserId);
+
+      if (updateError) {
+        console.error('Error updating stats:', updateError);
+        toast.error('Failed to update player stats');
+        return;
+      }
 
       await supabase.rpc('log_admin_action', {
         p_action_type: 'modify_level',
         p_entity_type: 'user',
         p_entity_id: selectedUserId,
-        p_details: { old_level: currentStats?.level, new_level: newLevel, new_xp: newXp }
+        p_details: { old_level: currentLevel, new_level: newLevel, new_xp: newXp }
       });
 
-      toast.success(`Level changed from ${currentStats?.level || 1} to ${newLevel}`);
+      toast.success(`Level changed from ${currentLevel} to ${newLevel}`);
       setShowModifyLevelDialog(false);
       setModifyAmount('');
       fetchData();
