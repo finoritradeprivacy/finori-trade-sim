@@ -20,7 +20,7 @@ const TradeHistory = () => {
         .eq("user_id", user.id)
         .eq("status", "filled")
         .order("filled_at", { ascending: false })
-        .limit(10);
+        .limit(15);
 
       if (data) {
         setTrades(data);
