@@ -548,6 +548,7 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
         const tl = chart.addSeries(LineSeries, {
           color,
           lineWidth: 2,
+          lineStyle: 1, // Dashed line
           lastValueVisible: false,
           priceLineVisible: false,
           crosshairMarkerVisible: false,
@@ -584,14 +585,21 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
       }
     });
 
-    // Combine with trade markers
-    const tradeMarkers = trades.map((trade) => ({
-      time: trade.timestamp as UTCTimestamp,
-      position: (trade.type === 'buy' ? 'belowBar' : 'aboveBar') as 'belowBar' | 'aboveBar',
-      color: trade.type === 'buy' ? '#8B5CF6' : '#F6465D',
-      shape: (trade.type === 'buy' ? 'arrowUp' : 'arrowDown') as 'arrowUp' | 'arrowDown',
-      text: `${trade.type.toUpperCase()} ${trade.amount.toFixed(4)} @ $${trade.price.toFixed(2)}`,
-    }));
+    // Combine with trade markers - deduplicate by trade ID
+    const seenTradeIds = new Set<string>();
+    const tradeMarkers = trades
+      .filter((trade) => {
+        if (seenTradeIds.has(trade.id)) return false;
+        seenTradeIds.add(trade.id);
+        return true;
+      })
+      .map((trade) => ({
+        time: trade.timestamp as UTCTimestamp,
+        position: (trade.type === 'buy' ? 'belowBar' : 'aboveBar') as 'belowBar' | 'aboveBar',
+        color: trade.type === 'buy' ? '#8B5CF6' : '#F6465D',
+        shape: (trade.type === 'buy' ? 'arrowUp' : 'arrowDown') as 'arrowUp' | 'arrowDown',
+        text: `${trade.type.toUpperCase()} ${trade.amount.toFixed(4)} @ $${trade.price.toFixed(2)}`,
+      }));
 
     const allMarkers = [...tradeMarkers, ...markers];
     
