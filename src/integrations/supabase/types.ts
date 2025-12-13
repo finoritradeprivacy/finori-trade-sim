@@ -458,6 +458,39 @@ export type Database = {
           },
         ]
       }
+      pending_email_verifications: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          nickname: string
+          otp_code: string
+          password_hash: string
+          verified: boolean
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          nickname: string
+          otp_code: string
+          password_hash: string
+          verified?: boolean
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          nickname?: string
+          otp_code?: string
+          password_hash?: string
+          verified?: boolean
+        }
+        Relationships: []
+      }
       player_stats: {
         Row: {
           achievements: Json | null
