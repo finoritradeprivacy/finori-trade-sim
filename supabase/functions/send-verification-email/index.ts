@@ -99,7 +99,7 @@ serve(async (req: Request): Promise<Response> => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "FinoriTrade <onboarding@resend.dev>",
+          from: "FinoriTrade <noreply@finoritrade.com>",
           to: [email],
           subject: "Your FinoriTrade Verification Code",
           html: `
@@ -272,7 +272,7 @@ serve(async (req: Request): Promise<Response> => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          from: "FinoriTrade <onboarding@resend.dev>",
+          from: "FinoriTrade <noreply@finoritrade.com>",
           to: [email],
           subject: "Your FinoriTrade Verification Code",
           html: `
