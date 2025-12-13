@@ -539,6 +539,54 @@ export type Database = {
           },
         ]
       }
+      price_alerts: {
+        Row: {
+          asset_id: string
+          condition: string
+          created_at: string
+          id: string
+          is_active: boolean
+          target_price: number
+          triggered_at: string | null
+          user_id: string
+        }
+        Insert: {
+          asset_id: string
+          condition: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          target_price: number
+          triggered_at?: string | null
+          user_id: string
+        }
+        Update: {
+          asset_id?: string
+          condition?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          target_price?: number
+          triggered_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_alerts_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_alerts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       price_history: {
         Row: {
           asset_id: string

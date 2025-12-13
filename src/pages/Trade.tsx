@@ -13,6 +13,8 @@ import OpenOrders from "@/components/trading/OpenOrders";
 import TradeHistory from "@/components/trading/TradeHistory";
 import NewsFeed from "@/components/trading/NewsFeed";
 import PlayerProfile from "@/components/trading/PlayerProfile";
+import { PriceAlerts } from "@/components/trading/PriceAlerts";
+import { ConnectionStatus } from "@/components/trading/ConnectionStatus";
 
 const Trade = () => {
   const { user, loading } = useAuth();
@@ -105,11 +107,14 @@ const Trade = () => {
       <Header />
       
       <div className="container mx-auto p-4 space-y-4">
-        <AssetSelector
-          assets={assets}
-          selectedAsset={selectedAsset}
-          onSelectAsset={setSelectedAsset}
-        />
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <AssetSelector
+            assets={assets}
+            selectedAsset={selectedAsset}
+            onSelectAsset={setSelectedAsset}
+          />
+          <ConnectionStatus assetId={selectedAsset?.id} />
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <div className="lg:col-span-9 space-y-4">
@@ -130,6 +135,7 @@ const Trade = () => {
 
           <div className="lg:col-span-3 space-y-4">
             <PlayerProfile />
+            <PriceAlerts assets={assets} selectedAsset={selectedAsset} />
             <OrderBook asset={selectedAsset} />
             <OrderForm asset={selectedAsset} />
             <Portfolio />

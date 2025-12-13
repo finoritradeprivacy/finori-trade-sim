@@ -236,13 +236,67 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Check price alerts and trigger notifications
+    const { data: activeAlerts, error: alertsError } = await supabase
+      .from('price_alerts')
+      .select('*, assets!inner(symbol, current_price)')
+      .eq('is_active', true);
+
+    if (!alertsError && activeAlerts && activeAlerts.length > 0) {
+      for (const alert of activeAlerts) {
+        const asset = assets?.find(a => a.id === alert.asset_id);
+        if (!asset) continue;
+
+        const currentPrice = Number(asset.current_price);
+        const targetPrice = Number(alert.target_price);
+        let triggered = false;
+
+        if (alert.condition === 'above' && currentPrice >= targetPrice) {
+          triggered = true;
+        } else if (alert.condition === 'below' && currentPrice <= targetPrice) {
+          triggered = true;
+        }
+
+        if (triggered) {
+          // Mark alert as triggered
+          await supabase
+            .from('price_alerts')
+            .update({ 
+              is_active: false, 
+              triggered_at: new Date().toISOString() 
+            })
+            .eq('id', alert.id);
+
+          // Create notification for user
+          await supabase
+            .from('user_notifications')
+            .insert({
+              user_id: alert.user_id,
+              notification_type: 'price_alert',
+              title: `Price Alert: ${asset.symbol}`,
+              message: `${asset.symbol} has reached $${currentPrice.toFixed(2)} (target: $${targetPrice.toFixed(2)} ${alert.condition})`,
+              metadata: {
+                asset_id: alert.asset_id,
+                asset_symbol: asset.symbol,
+                target_price: targetPrice,
+                current_price: currentPrice,
+                condition: alert.condition
+              }
+            });
+
+          console.log(`Alert triggered for ${asset.symbol}: ${currentPrice} ${alert.condition} ${targetPrice}`);
+        }
+      }
+    }
+
     console.log('Price update cycle completed');
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         updated: assets?.length || 0,
-        newsProcessed: triggeredNews?.length || 0 
+        newsProcessed: triggeredNews?.length || 0,
+        alertsChecked: activeAlerts?.length || 0
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
