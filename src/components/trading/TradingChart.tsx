@@ -60,31 +60,28 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
   const [drawingInProgress, setDrawingInProgress] = useState<{ type: DrawingTool; points: Array<{ time: number; price: number }> } | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [priceCountdown, setPriceCountdown] = useState(15);
-  const lastUpdateTimeRef = useRef<Date | null>(null);
 
-  // Price update countdown - syncs with actual asset updates
+  // Price update countdown - calculates based on server's updated_at timestamp
   useEffect(() => {
-    if (asset?.updated_at) {
-      const updateTime = new Date(asset.updated_at);
-      // Only reset countdown when we detect a new update
-      if (!lastUpdateTimeRef.current || updateTime.getTime() > lastUpdateTimeRef.current.getTime()) {
-        lastUpdateTimeRef.current = updateTime;
-        setPriceCountdown(15);
-      }
-    }
-  }, [asset?.updated_at]);
+    const calculateCountdown = () => {
+      if (!asset?.updated_at) return 15;
+      
+      const lastUpdate = new Date(asset.updated_at).getTime();
+      const now = Date.now();
+      const elapsed = Math.floor((now - lastUpdate) / 1000);
+      const remaining = Math.max(0, 15 - elapsed);
+      
+      return remaining;
+    };
 
-  // Countdown timer
-  useEffect(() => {
+    setPriceCountdown(calculateCountdown());
+
     const interval = setInterval(() => {
-      setPriceCountdown(prev => {
-        if (prev <= 0) return 0;
-        return prev - 1;
-      });
-    }, 1000);
+      setPriceCountdown(calculateCountdown());
+    }, 500); // Update more frequently for accuracy
 
     return () => clearInterval(interval);
-  }, []);
+  }, [asset?.updated_at]);
 
   // Initialize chart
   useEffect(() => {
