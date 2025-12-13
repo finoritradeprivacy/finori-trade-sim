@@ -97,7 +97,7 @@ const AssetSelector = ({
           </div>
           
           {selectedCategory !== 'challenges' && selectedCategory !== 'news' && <Button variant="outline" size="icon" onClick={() => setShowOverview(true)} title="Assets Overview" className="flex-shrink-0 border-primary bg-primary">
-              <MoreVertical className="w-4 h-4 text-primary" />
+              <MoreVertical className="w-4 h-4 text-black stroke-[3]" />
             </Button>}
         </div>
       
