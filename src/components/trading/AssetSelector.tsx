@@ -86,24 +86,27 @@ const AssetSelector = ({ assets, selectedAsset, onSelectAsset }: AssetSelectorPr
   return (
     <>
       <Card className="p-4">
-        <div className="flex gap-2 mb-4">
-          {categories.map(({ id, label, icon: Icon }) => (
-            <Button
-              key={id}
-              variant={selectedCategory === id ? "default" : "outline"}
-              onClick={() => setSelectedCategory(id)}
-              className="flex items-center gap-2"
-            >
-              <Icon className="w-4 h-4" />
-              {label}
-            </Button>
-          ))}
+        <div className="flex items-center gap-2 mb-4">
+          <div className="flex gap-2 flex-wrap flex-1">
+            {categories.map(({ id, label, icon: Icon }) => (
+              <Button
+                key={id}
+                variant={selectedCategory === id ? "default" : "outline"}
+                onClick={() => setSelectedCategory(id)}
+                className="flex items-center gap-2"
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </Button>
+            ))}
+          </div>
           
           <Button
             variant="outline"
             size="icon"
             onClick={() => setShowOverview(true)}
-            className="ml-auto bg-secondary/50 hover:bg-secondary"
+            className="flex-shrink-0 bg-secondary/50 hover:bg-secondary border-primary/50"
+            title="Assets Overview"
           >
             <MoreVertical className="w-4 h-4 text-primary" />
           </Button>
