@@ -36,11 +36,15 @@ serve(async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const url = new URL(req.url);
-    const action = url.searchParams.get("action") || "send";
+    const body = await req.json();
+    const action = body.action || "send";
+
+    console.log(`Processing action: ${action}`, JSON.stringify(body));
 
     if (action === "send") {
-      const { email, nickname, password }: SendVerificationRequest = await req.json();
+      const email = body.email;
+      const nickname = body.nickname;
+      const password = body.password;
 
       if (!email || !nickname || !password) {
         return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -157,7 +161,8 @@ serve(async (req: Request): Promise<Response> => {
       });
 
     } else if (action === "verify") {
-      const { email, code }: VerifyCodeRequest = await req.json();
+      const email = body.email;
+      const code = body.code;
 
       if (!email || !code) {
         return new Response(JSON.stringify({ error: "Missing email or code" }), {
@@ -221,7 +226,7 @@ serve(async (req: Request): Promise<Response> => {
       });
 
     } else if (action === "resend") {
-      const { email }: ResendCodeRequest = await req.json();
+      const email = body.email;
 
       if (!email) {
         return new Response(JSON.stringify({ error: "Missing email" }), {

@@ -124,8 +124,8 @@ const Auth = () => {
     setLoading(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('send-verification-email?action=verify', {
-        body: { email: pendingEmail, code: otpCode },
+      const { data, error } = await supabase.functions.invoke('send-verification-email', {
+        body: { action: 'verify', email: pendingEmail, code: otpCode },
       });
 
       if (error || data?.error) {
@@ -154,8 +154,8 @@ const Auth = () => {
     setLoading(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('send-verification-email?action=resend', {
-        body: { email: pendingEmail },
+      const { data, error } = await supabase.functions.invoke('send-verification-email', {
+        body: { action: 'resend', email: pendingEmail },
       });
 
       if (error || data?.error) {
