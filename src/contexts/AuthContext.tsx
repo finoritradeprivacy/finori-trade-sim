@@ -65,22 +65,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            nickname, // Pass nickname to trigger via user metadata
+          },
         },
       });
 
       if (authError) return { error: authError };
       if (!authData.user) return { error: new Error("No user returned") };
 
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .insert({
-          id: authData.user.id,
-          nickname,
-          email,
-        });
-
-      if (profileError) return { error: profileError };
-
+      // Profile is created automatically by the handle_new_user trigger
       return { error: null };
     } catch (error) {
       return { error };
