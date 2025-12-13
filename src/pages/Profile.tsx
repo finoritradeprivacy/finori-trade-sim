@@ -54,13 +54,6 @@ const Profile = () => {
     }
     fetchProfileData();
     setEmailVerified(user.email_confirmed_at !== null);
-
-    // Track played time
-    const interval = setInterval(() => {
-      updatePlayedTime();
-    }, 60000); // Update every minute
-
-    return () => clearInterval(interval);
   }, [user, navigate]);
 
   const fetchProfileData = async () => {
@@ -97,13 +90,6 @@ const Profile = () => {
     }
   };
 
-  const updatePlayedTime = async () => {
-    if (!user) return;
-    await supabase.from("profiles").update({
-      played_time_seconds: (profileData?.played_time_seconds || 0) + 60,
-      last_active_at: new Date().toISOString()
-    }).eq("id", user.id);
-  };
 
   const handleResetPortfolio = async () => {
     if (!user) return;

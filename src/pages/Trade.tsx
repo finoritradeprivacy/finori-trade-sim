@@ -29,6 +29,25 @@ const Trade = () => {
     }
   }, [user, loading, navigate]);
 
+  // Track played time every minute
+  useEffect(() => {
+    if (!user) return;
+
+    const updatePlayedTime = async () => {
+      // Use raw SQL call since RPC types may not be updated yet
+      await supabase.from("profiles").update({
+        last_active_at: new Date().toISOString()
+      }).eq("id", user.id);
+      
+      // Increment played time using raw query
+      await supabase.rpc('increment_played_time' as any, { p_user_id: user.id, p_seconds: 60 });
+    };
+
+    const interval = setInterval(updatePlayedTime, 60000);
+
+    return () => clearInterval(interval);
+  }, [user]);
+
   useEffect(() => {
     const fetchAssets = async () => {
       const { data } = await supabase

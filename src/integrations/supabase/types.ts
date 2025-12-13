@@ -1084,6 +1084,10 @@ export type Database = {
         Args: { p_amount: number; p_user_id: string }
         Returns: undefined
       }
+      increment_played_time: {
+        Args: { p_seconds: number; p_user_id: string }
+        Returns: undefined
+      }
       increment_xp: {
         Args: { p_amount: number; p_user_id: string }
         Returns: undefined
