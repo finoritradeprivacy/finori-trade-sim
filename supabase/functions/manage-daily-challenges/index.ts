@@ -19,6 +19,7 @@ serve(async (req) => {
     // Get authenticated user from JWT
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.log('Missing authorization header');
       return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -31,6 +32,7 @@ serve(async (req) => {
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
+      console.log('Auth error:', authError?.message || 'No user found');
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -41,7 +43,19 @@ serve(async (req) => {
     const userId = user.id;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { action } = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      console.log('Failed to parse request body:', e);
+      return new Response(JSON.stringify({ error: 'Invalid request body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const { action } = body;
+    console.log('Processing action:', action, 'for user:', userId);
 
     if (action === 'generate_daily_challenges') {
       // Get today's date
@@ -84,15 +98,19 @@ serve(async (req) => {
       const today = new Date().toISOString().split('T')[0];
 
       // Get user's current streak
-      const { data: streak } = await supabase
+      const { data: streak, error: streakError } = await supabase
         .from('user_daily_streak')
         .select('*')
         .eq('user_id', userId)
         .single();
 
+      if (streakError && streakError.code !== 'PGRST116') {
+        console.log('Error fetching streak:', streakError.message);
+      }
+
       if (!streak) {
         // Create new streak
-        await supabase
+        const { error: insertError } = await supabase
           .from('user_daily_streak')
           .insert({
             user_id: userId,
@@ -100,6 +118,15 @@ serve(async (req) => {
             last_login_date: today,
             streak_history: [{ date: today, status: 'completed' }]
           });
+
+        if (insertError) {
+          console.log('Error creating streak:', insertError.message);
+        }
+
+        console.log('Created new streak for user:', userId);
+        return new Response(JSON.stringify({ streak: 1, new: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       } else {
         const lastLogin = new Date(streak.last_login_date);
         const todayDate = new Date(today);
@@ -107,6 +134,7 @@ serve(async (req) => {
 
         if (diffDays === 0) {
           // Already logged in today, do nothing
+          console.log('User already logged in today, streak:', streak.current_streak);
           return new Response(JSON.stringify({ streak: streak.current_streak }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
@@ -126,6 +154,7 @@ serve(async (req) => {
               p_user_id: userId,
               p_amount: 250
             });
+            console.log('Awarded 7-day streak bonus to user:', userId);
           }
 
           await supabase
@@ -138,6 +167,7 @@ serve(async (req) => {
             })
             .eq('user_id', userId);
 
+          console.log('Updated streak to', newStreak, 'for user:', userId);
           return new Response(JSON.stringify({ streak: newStreak, bonus: newStreak % 7 === 0 }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
@@ -155,6 +185,7 @@ serve(async (req) => {
             })
             .eq('user_id', userId);
 
+          console.log('Streak broken, reset to 1 for user:', userId);
           return new Response(JSON.stringify({ streak: 1, broken: true }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
