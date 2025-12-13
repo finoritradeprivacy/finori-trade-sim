@@ -14,8 +14,9 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { 
-  DollarSign, Settings, Trophy, RefreshCw, Plus, Minus, Zap
+  DollarSign, Settings, Trophy, RefreshCw, Plus, Minus, Zap, TrendingUp, Percent
 } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
 
 interface TradingSetting {
   id: string;
@@ -33,17 +34,30 @@ interface TopTrader {
   level: number;
 }
 
+interface StockAsset {
+  id: string;
+  symbol: string;
+  name: string;
+  dividend_yield: number;
+  current_price: number;
+}
+
 export const AdminEconomy = () => {
   const [settings, setSettings] = useState<TradingSetting[]>([]);
   const [topTraders, setTopTraders] = useState<TopTrader[]>([]);
+  const [stockAssets, setStockAssets] = useState<StockAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModifyBalanceDialog, setShowModifyBalanceDialog] = useState(false);
   const [showModifyLevelDialog, setShowModifyLevelDialog] = useState(false);
+  const [showDividendDialog, setShowDividendDialog] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedStock, setSelectedStock] = useState<StockAsset | null>(null);
+  const [dividendYield, setDividendYield] = useState(4.8);
   const [modifyAmount, setModifyAmount] = useState('');
   const [modifyType, setModifyType] = useState<'add' | 'remove'>('add');
   const [users, setUsers] = useState<{ id: string; nickname: string; balance: number; level: number }[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [stockSearchTerm, setStockSearchTerm] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -59,6 +73,14 @@ export const AdminEconomy = () => {
         .order('setting_key');
       setSettings(settingsData || []);
 
+      // Fetch stock assets with dividend yields
+      const { data: stocksData } = await supabase
+        .from('assets')
+        .select('id, symbol, name, dividend_yield, current_price')
+        .eq('category', 'stocks')
+        .eq('is_active', true)
+        .order('symbol');
+      setStockAssets(stocksData || []);
       // Fetch top traders
       const { data: tradersData } = await supabase
         .from('profiles')
@@ -197,7 +219,37 @@ export const AdminEconomy = () => {
     }
   };
 
-  const getSettingInput = (setting: TradingSetting) => {
+  const handleUpdateDividendYield = async () => {
+    if (!selectedStock) return;
+
+    try {
+      const newYield = dividendYield / 100; // Convert from percent to decimal
+
+      await supabase
+        .from('assets')
+        .update({ dividend_yield: newYield })
+        .eq('id', selectedStock.id);
+
+      await supabase.rpc('log_admin_action', {
+        p_action_type: 'update_dividend_yield',
+        p_entity_type: 'asset',
+        p_entity_id: selectedStock.id,
+        p_details: { 
+          symbol: selectedStock.symbol, 
+          old_yield: selectedStock.dividend_yield, 
+          new_yield: newYield 
+        }
+      });
+
+      toast.success(`Dividend yield for ${selectedStock.symbol} updated to ${dividendYield}%`);
+      setShowDividendDialog(false);
+      fetchData();
+    } catch (error) {
+      console.error('Error updating dividend yield:', error);
+      toast.error('Failed to update dividend yield');
+    }
+  };
+
     const value = setting.setting_value;
     const key = setting.setting_key;
 
@@ -227,6 +279,11 @@ export const AdminEconomy = () => {
 
   const filteredUsers = users.filter(u => 
     u.nickname.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredStocks = stockAssets.filter(s =>
+    s.symbol.toLowerCase().includes(stockSearchTerm.toLowerCase()) ||
+    s.name.toLowerCase().includes(stockSearchTerm.toLowerCase())
   );
 
   return (
@@ -300,6 +357,55 @@ export const AdminEconomy = () => {
                     >
                       <Zap className="h-4 w-4 mr-1" />
                       Level
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Dividend Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Percent className="h-5 w-5 text-green-500" />
+            Stock Dividend Yields
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <Input
+              placeholder="Search stocks..."
+              value={stockSearchTerm}
+              onChange={(e) => setStockSearchTerm(e.target.value)}
+            />
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {filteredStocks.map((stock) => (
+                <div key={stock.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                  <div>
+                    <p className="font-medium">{stock.symbol}</p>
+                    <p className="text-sm text-muted-foreground">{stock.name}</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Current yield</p>
+                      <Badge variant={stock.dividend_yield > 0 ? 'default' : 'secondary'} className={stock.dividend_yield > 0 ? 'bg-green-500/20 text-green-400' : ''}>
+                        {(stock.dividend_yield * 100).toFixed(1)}%
+                      </Badge>
+                    </div>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => { 
+                        setSelectedStock(stock); 
+                        setDividendYield(stock.dividend_yield * 100);
+                        setShowDividendDialog(true); 
+                      }}
+                    >
+                      <TrendingUp className="h-4 w-4 mr-1" />
+                      Edit
                     </Button>
                   </div>
                 </div>
@@ -432,6 +538,61 @@ export const AdminEconomy = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowModifyLevelDialog(false)}>Cancel</Button>
             <Button onClick={handleModifyLevel}>Apply</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modify Dividend Dialog */}
+      <Dialog open={showDividendDialog} onOpenChange={setShowDividendDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modify Dividend Yield</DialogTitle>
+            <DialogDescription>
+              Adjust annual dividend yield for {selectedStock?.symbol}. Dividends are paid daily at 10:00 UTC.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Annual Dividend Yield: {dividendYield.toFixed(1)}%</Label>
+              <Slider
+                value={[dividendYield]}
+                onValueChange={(value) => setDividendYield(value[0])}
+                min={0}
+                max={15}
+                step={0.1}
+                className="mt-2"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                Daily payout: ~{(dividendYield / 365).toFixed(4)}% per day
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                size="sm" 
+                variant={dividendYield === 0 ? 'default' : 'outline'}
+                onClick={() => setDividendYield(0)}
+              >
+                0% (No Div)
+              </Button>
+              <Button 
+                size="sm" 
+                variant={dividendYield === 4.8 ? 'default' : 'outline'}
+                onClick={() => setDividendYield(4.8)}
+              >
+                4.8% (Default)
+              </Button>
+              <Button 
+                size="sm" 
+                variant={dividendYield === 8 ? 'default' : 'outline'}
+                onClick={() => setDividendYield(8)}
+              >
+                8% (High)
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDividendDialog(false)}>Cancel</Button>
+            <Button onClick={handleUpdateDividendYield}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

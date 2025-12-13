@@ -191,13 +191,20 @@ const AssetSelector = ({ assets, selectedAsset, onSelectAsset }: AssetSelectorPr
                           maximumFractionDigits: asset.current_price < 1 ? 6 : 2
                         })}
                       </p>
-                      <p className={cn(
-                        "text-xs font-medium",
-                        isPositive ? "text-success" : "text-destructive"
-                      )}>
-                        {isPositive ? "+" : ""}
-                        {Number(asset.price_change_24h).toFixed(2)}%
-                      </p>
+                      <div className="flex items-center justify-end gap-2">
+                        <p className={cn(
+                          "text-xs font-medium",
+                          isPositive ? "text-success" : "text-destructive"
+                        )}>
+                          {isPositive ? "+" : ""}
+                          {Number(asset.price_change_24h).toFixed(2)}%
+                        </p>
+                        {asset.category === 'stocks' && asset.dividend_yield > 0 && (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium">
+                            {(asset.dividend_yield * 100).toFixed(1)}% DIV
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </button>
