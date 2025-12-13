@@ -250,6 +250,7 @@ export const AdminEconomy = () => {
     }
   };
 
+  const getSettingInput = (setting: TradingSetting) => {
     const value = setting.setting_value;
     const key = setting.setting_key;
 
