@@ -22,12 +22,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Update daily streak when user logs in
+  const updateDailyStreak = async (userId: string) => {
+    try {
+      await supabase.functions.invoke('manage-daily-challenges', {
+        body: { action: 'update_streak', userId }
+      });
+    } catch (error) {
+      console.error('Error updating daily streak:', error);
+    }
+  };
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // Update streak on sign in
+        if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') && session?.user) {
+          setTimeout(() => {
+            updateDailyStreak(session.user.id);
+          }, 0);
+        }
       }
     );
 
