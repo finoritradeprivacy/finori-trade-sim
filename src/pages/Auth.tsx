@@ -48,6 +48,13 @@ const Auth = () => {
 
   const isPasswordValid = Object.values(passwordRequirements).every(Boolean);
 
+  const passwordStrength = useMemo(() => {
+    const metCount = Object.values(passwordRequirements).filter(Boolean).length;
+    if (metCount <= 2) return { level: 'weak', label: 'Weak', color: 'bg-loss' };
+    if (metCount <= 4) return { level: 'medium', label: 'Medium', color: 'bg-warning' };
+    return { level: 'strong', label: 'Strong', color: 'bg-profit' };
+  }, [passwordRequirements]);
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -407,8 +414,31 @@ const Auth = () => {
                     </Button>
                   </div>
                   {password && (
-                    <div className="mt-2 space-y-1 text-xs">
-                      <p className="text-muted-foreground font-medium mb-1">Password must contain:</p>
+                    <div className="mt-2 space-y-2 text-xs">
+                      {/* Strength Meter */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground font-medium">Password strength:</span>
+                          <span className={`font-semibold ${
+                            passwordStrength.level === 'weak' ? 'text-loss' : 
+                            passwordStrength.level === 'medium' ? 'text-warning' : 'text-profit'
+                          }`}>
+                            {passwordStrength.label}
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-300 ${passwordStrength.color}`}
+                            style={{ 
+                              width: passwordStrength.level === 'weak' ? '33%' : 
+                                     passwordStrength.level === 'medium' ? '66%' : '100%' 
+                            }}
+                          />
+                        </div>
+                      </div>
+                      
+                      {/* Requirements List */}
+                      <p className="text-muted-foreground font-medium">Password must contain:</p>
                       <div className="grid grid-cols-2 gap-1">
                         <div className={`flex items-center gap-1 ${passwordRequirements.hasMinLength ? 'text-profit' : 'text-muted-foreground'}`}>
                           {passwordRequirements.hasMinLength ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
