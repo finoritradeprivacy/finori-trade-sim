@@ -342,6 +342,8 @@ export const AdminEconomy = () => {
                       variant="outline"
                       onClick={() => { 
                         setSelectedUserId(user.id); 
+                        setModifyType('add');
+                        setModifyAmount('');
                         setShowModifyBalanceDialog(true); 
                       }}
                     >
@@ -353,6 +355,8 @@ export const AdminEconomy = () => {
                       variant="outline"
                       onClick={() => { 
                         setSelectedUserId(user.id); 
+                        setModifyType('add');
+                        setModifyAmount('');
                         setShowModifyLevelDialog(true); 
                       }}
                     >
