@@ -1169,6 +1169,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_level_from_xp: { Args: { total_xp: number }; Returns: number }
       calculate_total_xp_for_level: {
         Args: { target_level: number }
         Returns: number
