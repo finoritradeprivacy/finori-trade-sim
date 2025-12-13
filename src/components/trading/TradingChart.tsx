@@ -61,17 +61,20 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [priceCountdown, setPriceCountdown] = useState(60);
 
-  // Price update countdown - resets every minute
+  // Price update countdown - resets every 15 seconds
   useEffect(() => {
-    const calculateSecondsToNextMinute = () => {
+    const calculateSecondsToNextUpdate = () => {
       const now = new Date();
-      return 60 - now.getSeconds();
+      const seconds = now.getSeconds();
+      // Updates happen at 0, 15, 30, 45 seconds of each minute
+      const secondsInCycle = seconds % 15;
+      return 15 - secondsInCycle;
     };
 
-    setPriceCountdown(calculateSecondsToNextMinute());
+    setPriceCountdown(calculateSecondsToNextUpdate());
 
     const interval = setInterval(() => {
-      setPriceCountdown(calculateSecondsToNextMinute());
+      setPriceCountdown(calculateSecondsToNextUpdate());
     }, 1000);
 
     return () => clearInterval(interval);
