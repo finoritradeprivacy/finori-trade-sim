@@ -6,8 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { toast } from "sonner";
-import { TrendingUp, Shield, Zap, Eye, EyeOff, Check, X } from "lucide-react";
+import { TrendingUp, Shield, Zap, Eye, EyeOff, Check, X, Mail, ArrowLeft, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
@@ -23,13 +25,19 @@ const Auth = () => {
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
-  const { signUp, signIn, user, resetPassword, updatePassword } = useAuth();
+  
+  // OTP verification states
+  const [showOtpVerification, setShowOtpVerification] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+  
+  const { signIn, user, resetPassword, updatePassword } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
     if (user) {
-      // Check if this is a password reset flow
       if (searchParams.get("reset") === "true") {
         setShowResetPassword(true);
       } else {
@@ -37,6 +45,14 @@ const Auth = () => {
       }
     }
   }, [user, navigate, searchParams]);
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
 
   const passwordRequirements = useMemo(() => ({
     hasMinLength: password.length >= 8,
@@ -74,15 +90,87 @@ const Auth = () => {
     }
 
     setLoading(true);
-    const { error } = await signUp(email, password, nickname);
-    setLoading(false);
+    
+    try {
+      // Call edge function to send verification email
+      const { data, error } = await supabase.functions.invoke('send-verification-email', {
+        body: { email, nickname, password },
+      });
 
-    if (error) {
-      toast.error(error.message || "Failed to sign up");
-    } else {
-      toast.success("Account created successfully!");
-      navigate("/trade");
+      if (error || data?.error) {
+        toast.error(data?.error || error?.message || "Failed to send verification email");
+        setLoading(false);
+        return;
+      }
+
+      // Show OTP verification screen
+      setPendingEmail(email);
+      setShowOtpVerification(true);
+      setResendCooldown(60);
+      toast.success("Verification code sent to your email!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send verification email");
     }
+    
+    setLoading(false);
+  };
+
+  const handleVerifyOtp = async () => {
+    if (otpCode.length !== 6) {
+      toast.error("Please enter the 6-digit code");
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('send-verification-email?action=verify', {
+        body: { email: pendingEmail, code: otpCode },
+      });
+
+      if (error || data?.error) {
+        toast.error(data?.error || error?.message || "Invalid verification code");
+        setLoading(false);
+        return;
+      }
+
+      toast.success("Email verified! You can now sign in.");
+      setShowOtpVerification(false);
+      setOtpCode("");
+      setPendingEmail("");
+      // Reset form
+      setPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      toast.error(err.message || "Verification failed");
+    }
+    
+    setLoading(false);
+  };
+
+  const handleResendCode = async () => {
+    if (resendCooldown > 0) return;
+    
+    setLoading(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('send-verification-email?action=resend', {
+        body: { email: pendingEmail },
+      });
+
+      if (error || data?.error) {
+        toast.error(data?.error || error?.message || "Failed to resend code");
+        setLoading(false);
+        return;
+      }
+
+      setResendCooldown(60);
+      toast.success("New verification code sent!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to resend code");
+    }
+    
+    setLoading(false);
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -142,6 +230,88 @@ const Auth = () => {
       navigate("/trade");
     }
   };
+
+  // OTP Verification screen
+  if (showOtpVerification) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="p-8 border-glow w-full max-w-md">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/20 flex items-center justify-center">
+              <Mail className="w-8 h-8 text-primary" />
+            </div>
+            <h2 className="text-2xl font-bold">Verify Your Email</h2>
+            <p className="text-muted-foreground mt-2">
+              We sent a 6-digit code to<br />
+              <span className="text-foreground font-medium">{pendingEmail}</span>
+            </p>
+          </div>
+
+          <div className="flex justify-center mb-6">
+            <InputOTP
+              maxLength={6}
+              value={otpCode}
+              onChange={setOtpCode}
+            >
+              <InputOTPGroup>
+                <InputOTPSlot index={0} />
+                <InputOTPSlot index={1} />
+                <InputOTPSlot index={2} />
+                <InputOTPSlot index={3} />
+                <InputOTPSlot index={4} />
+                <InputOTPSlot index={5} />
+              </InputOTPGroup>
+            </InputOTP>
+          </div>
+
+          <Button
+            onClick={handleVerifyOtp}
+            className="w-full gradient-purple glow-purple mb-4"
+            disabled={loading || otpCode.length !== 6}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Verifying...
+              </>
+            ) : (
+              "Verify Email"
+            )}
+          </Button>
+
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground mb-2">
+              Didn't receive the code?
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleResendCode}
+              disabled={resendCooldown > 0 || loading}
+            >
+              {resendCooldown > 0 ? (
+                `Resend in ${resendCooldown}s`
+              ) : (
+                "Resend Code"
+              )}
+            </Button>
+          </div>
+
+          <Button
+            variant="ghost"
+            className="w-full mt-4"
+            onClick={() => {
+              setShowOtpVerification(false);
+              setOtpCode("");
+            }}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Sign Up
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   // Reset password form (after clicking email link)
   if (showResetPassword) {
@@ -415,7 +585,6 @@ const Auth = () => {
                   </div>
                   {password && (
                     <div className="mt-2 space-y-2 text-xs">
-                      {/* Strength Meter */}
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground font-medium">Password strength:</span>
@@ -437,7 +606,6 @@ const Auth = () => {
                         </div>
                       </div>
                       
-                      {/* Requirements List */}
                       <p className="text-muted-foreground font-medium">Password must contain:</p>
                       <div className="grid grid-cols-2 gap-1">
                         <div className={`flex items-center gap-1 ${passwordRequirements.hasMinLength ? 'text-profit' : 'text-muted-foreground'}`}>
@@ -454,7 +622,7 @@ const Auth = () => {
                         </div>
                         <div className={`flex items-center gap-1 ${passwordRequirements.hasDigit ? 'text-profit' : 'text-muted-foreground'}`}>
                           {passwordRequirements.hasDigit ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-                          <span>Digit (0-9)</span>
+                          <span>Number (0-9)</span>
                         </div>
                         <div className={`flex items-center gap-1 ${passwordRequirements.hasSymbol ? 'text-profit' : 'text-muted-foreground'}`}>
                           {passwordRequirements.hasSymbol ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
@@ -466,10 +634,10 @@ const Auth = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirm Password</Label>
+                  <Label htmlFor="signup-confirm-password">Confirm Password</Label>
                   <div className="relative">
                     <Input
-                      id="confirm-password"
+                      id="signup-confirm-password"
                       type={showConfirmPassword ? "text" : "password"}
                       placeholder="••••••••"
                       value={confirmPassword}
@@ -493,7 +661,14 @@ const Auth = () => {
                   className="w-full gradient-purple glow-purple"
                   disabled={loading}
                 >
-                  {loading ? "Creating account..." : "Create Account"}
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Sending verification...
+                    </>
+                  ) : (
+                    "Sign Up"
+                  )}
                 </Button>
               </form>
             </TabsContent>
