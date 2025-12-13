@@ -2,10 +2,12 @@ import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 const TradeHistory = () => {
   const { user } = useAuth();
   const [trades, setTrades] = useState<any[]>([]);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -50,9 +52,25 @@ const TradeHistory = () => {
     };
   }, [user]);
 
+  const displayedTrades = isExpanded ? trades : trades.slice(0, 3);
+
   return (
     <Card className="p-4">
-      <h3 className="text-lg font-semibold mb-4">Recent Trades</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold">Recent Trades</h3>
+        {trades.length > 3 && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-primary hover:text-primary/80 transition-colors"
+          >
+            {isExpanded ? (
+              <ChevronUp className="w-5 h-5" />
+            ) : (
+              <ChevronDown className="w-5 h-5" />
+            )}
+          </button>
+        )}
+      </div>
       
       {trades.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
@@ -60,7 +78,7 @@ const TradeHistory = () => {
         </div>
       ) : (
         <div className="space-y-2">
-          {trades.map((trade: any) => (
+          {displayedTrades.map((trade: any) => (
             <div
               key={trade.id}
               className="p-3 bg-secondary rounded-lg hover:bg-secondary/80 transition-colors"

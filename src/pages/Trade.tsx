@@ -6,7 +6,7 @@ import { usePriceUpdates } from "@/hooks/usePriceUpdates";
 import Header from "@/components/trading/Header";
 import AssetSelector from "@/components/trading/AssetSelector";
 import { TradingChart } from "@/components/trading/TradingChart";
-import OrderBook from "@/components/trading/OrderBook";
+
 import OrderForm from "@/components/trading/OrderForm";
 import Portfolio from "@/components/trading/Portfolio";
 import OpenOrders from "@/components/trading/OpenOrders";
@@ -136,7 +136,6 @@ const Trade = () => {
           <div className="lg:col-span-3 space-y-4">
             <PlayerProfile />
             <PriceAlerts assets={assets} selectedAsset={selectedAsset} />
-            <OrderBook asset={selectedAsset} />
             <OrderForm asset={selectedAsset} />
             <Portfolio />
           </div>
