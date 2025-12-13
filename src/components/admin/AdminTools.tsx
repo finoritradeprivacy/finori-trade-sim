@@ -238,16 +238,34 @@ export const AdminTools = () => {
     }
   };
 
+  const [isGeneratingNews, setIsGeneratingNews] = useState(false);
+
   const handleTriggerNewsGeneration = async () => {
+    setIsGeneratingNews(true);
     try {
       const response = await supabase.functions.invoke('generate-news');
       
       if (response.error) throw response.error;
 
-      toast.success('News generation triggered');
-    } catch (error) {
+      const data = response.data;
+      if (data?.generated) {
+        toast.success(`Generated ${data.generated} news events`);
+      } else if (data?.message) {
+        toast.info(data.message);
+      } else {
+        toast.success('News generation triggered');
+      }
+
+      await supabase.rpc('log_admin_action', {
+        p_action_type: 'trigger_news_generation',
+        p_entity_type: 'news',
+        p_details: { generated: data?.generated || 0 }
+      });
+    } catch (error: any) {
       console.error('Error triggering news generation:', error);
-      toast.error('Failed to trigger news generation');
+      toast.error(error.message || 'Failed to trigger news generation');
+    } finally {
+      setIsGeneratingNews(false);
     }
   };
 
@@ -422,9 +440,10 @@ export const AdminTools = () => {
                 <Button 
                   variant="outline"
                   onClick={handleTriggerNewsGeneration}
+                  disabled={isGeneratingNews}
                 >
-                  <Zap className="h-4 w-4 mr-2" />
-                  Trigger News Generation
+                  <Zap className={`h-4 w-4 mr-2 ${isGeneratingNews ? 'animate-spin' : ''}`} />
+                  {isGeneratingNews ? 'Generating...' : 'Generate Market News'}
                 </Button>
               </div>
             </CardContent>
