@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Bell, BellRing, Plus, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSoundAlerts } from '@/hooks/useSoundAlerts';
+import { SoundToggle } from './SoundToggle';
 
 interface PriceAlert {
   id: string;
@@ -39,6 +41,8 @@ export const PriceAlerts = ({ assets, selectedAsset }: PriceAlertsProps) => {
     target_price: '',
     condition: 'above' as 'above' | 'below'
   });
+  const { soundEnabled, setSoundEnabled, playPriceAlertSound } = useSoundAlerts();
+  const previousTriggeredRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (user) {
@@ -49,7 +53,34 @@ export const PriceAlerts = ({ assets, selectedAsset }: PriceAlertsProps) => {
         .channel('price-alerts-changes')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'price_alerts' },
+          { event: 'UPDATE', schema: 'public', table: 'price_alerts' },
+          (payload) => {
+            // Check if an alert was just triggered
+            const newData = payload.new as any;
+            if (newData && !newData.is_active && newData.triggered_at) {
+              // This alert was just triggered - check if it's new
+              if (!previousTriggeredRef.current.has(newData.id)) {
+                previousTriggeredRef.current.add(newData.id);
+                playPriceAlertSound();
+                
+                // Find asset name
+                const asset = assets.find(a => a.id === newData.asset_id);
+                toast.success(`Price Alert Triggered!`, {
+                  description: `${asset?.symbol || 'Asset'} hit $${Number(newData.target_price).toFixed(2)}`
+                });
+              }
+            }
+            fetchAlerts();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'price_alerts' },
+          () => fetchAlerts()
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'price_alerts' },
           () => fetchAlerts()
         )
         .subscribe();
@@ -58,7 +89,7 @@ export const PriceAlerts = ({ assets, selectedAsset }: PriceAlertsProps) => {
         supabase.removeChannel(channel);
       };
     }
-  }, [user]);
+  }, [user, assets, playPriceAlertSound]);
 
   useEffect(() => {
     if (selectedAsset && dialogOpen) {
@@ -141,6 +172,7 @@ export const PriceAlerts = ({ assets, selectedAsset }: PriceAlertsProps) => {
               {activeAlerts.length} active
             </span>
           )}
+          <SoundToggle soundEnabled={soundEnabled} onToggle={setSoundEnabled} />
         </div>
         
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
