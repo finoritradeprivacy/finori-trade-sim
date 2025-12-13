@@ -59,6 +59,23 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
   const [lastCandle, setLastCandle] = useState<CandlestickData | null>(null);
   const [drawingInProgress, setDrawingInProgress] = useState<{ type: DrawingTool; points: Array<{ time: number; price: number }> } | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [priceCountdown, setPriceCountdown] = useState(60);
+
+  // Price update countdown - resets every minute
+  useEffect(() => {
+    const calculateSecondsToNextMinute = () => {
+      const now = new Date();
+      return 60 - now.getSeconds();
+    };
+
+    setPriceCountdown(calculateSecondsToNextMinute());
+
+    const interval = setInterval(() => {
+      setPriceCountdown(calculateSecondsToNextMinute());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Initialize chart
   useEffect(() => {
@@ -663,6 +680,9 @@ export const TradingChart = ({ asset }: TradingChartProps) => {
           </span>
           <span className={`text-sm font-medium ${asset?.price_change_24h >= 0 ? 'text-[#0ECB81]' : 'text-[#F6465D]'}`}>
             {asset?.price_change_24h >= 0 ? '+' : ''}{asset?.price_change_24h?.toFixed(2)}%
+          </span>
+          <span className="text-xs text-muted-foreground ml-2 bg-[#1E222D] px-2 py-1 rounded">
+            Next update: {priceCountdown}s
           </span>
         </div>
       </div>
