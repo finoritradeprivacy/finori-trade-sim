@@ -281,24 +281,12 @@ export const AdminUsers = () => {
     if (!selectedUser) return;
 
     try {
-      // Delete all user data in correct order (respecting foreign keys)
-      await supabase.from('portfolios').delete().eq('user_id', selectedUser.id);
-      await supabase.from('trades').delete().eq('user_id', selectedUser.id);
-      await supabase.from('orders').delete().eq('user_id', selectedUser.id);
-      await supabase.from('price_alerts').delete().eq('user_id', selectedUser.id);
-      await supabase.from('user_notifications').delete().eq('user_id', selectedUser.id);
-      await supabase.from('user_challenge_progress').delete().eq('user_id', selectedUser.id);
-      await supabase.from('user_daily_streak').delete().eq('user_id', selectedUser.id);
-      await supabase.from('dividend_payments').delete().eq('user_id', selectedUser.id);
-      await supabase.from('dividend_snapshots').delete().eq('user_id', selectedUser.id);
-      await supabase.from('promo_code_redemptions').delete().eq('user_id', selectedUser.id);
-      await supabase.from('user_sessions').delete().eq('user_id', selectedUser.id);
-      await supabase.from('user_bans').delete().eq('user_id', selectedUser.id);
-      await supabase.from('user_restrictions').delete().eq('user_id', selectedUser.id);
-      await supabase.from('user_roles').delete().eq('user_id', selectedUser.id);
-      await supabase.from('player_stats').delete().eq('user_id', selectedUser.id);
-      await supabase.from('user_balances').delete().eq('user_id', selectedUser.id);
-      await supabase.from('profiles').delete().eq('id', selectedUser.id);
+      // Use the admin RPC function to delete account (bypasses RLS)
+      const { error } = await supabase.rpc('admin_delete_user_account', {
+        p_user_id: selectedUser.id
+      });
+
+      if (error) throw error;
 
       await supabase.rpc('log_admin_action', {
         p_action_type: 'delete_account',
