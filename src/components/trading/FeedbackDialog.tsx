@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Send, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface FeedbackDialogProps {
   open: boolean;
@@ -35,22 +36,27 @@ export const FeedbackDialog = ({ open, onOpenChange }: FeedbackDialogProps) => {
 
     setSending(true);
 
-    // Create mailto link with form data
-    const mailtoBody = `Name: ${name}%0D%0AEmail: ${email}%0D%0A%0D%0AMessage:%0D%0A${encodeURIComponent(message)}`;
-    const mailtoLink = `mailto:finoritrade.privacy@gmail.com?subject=${encodeURIComponent(subject)}&body=${mailtoBody}`;
-    
-    // Open email client
-    window.open(mailtoLink, '_blank');
-    
-    setSending(false);
-    toast.success("Email client opened! Please send the email to complete your feedback.");
-    
-    // Reset form
-    setName("");
-    setEmail("");
-    setSubject("");
-    setMessage("");
-    onOpenChange(false);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-feedback', {
+        body: { name, email, subject, message }
+      });
+
+      if (error) throw error;
+
+      toast.success("Feedback sent successfully! We'll get back to you soon.");
+      
+      // Reset form
+      setName("");
+      setEmail("");
+      setSubject("");
+      setMessage("");
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error("Error sending feedback:", error);
+      toast.error(error.message || "Failed to send feedback. Please try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
