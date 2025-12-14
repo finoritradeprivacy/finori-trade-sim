@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Bell } from "lucide-react";
+import { Bell, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -13,6 +13,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { formatDistanceToNow } from "date-fns";
 import { useSoundAlerts } from "@/hooks/useSoundAlerts";
 
+interface DividendAsset {
+  asset_id: string;
+  amount: number;
+  shares: number;
+  symbol?: string;
+}
+
 interface Notification {
   id: string;
   notification_type: string;
@@ -20,7 +27,12 @@ interface Notification {
   message: string;
   is_read: boolean;
   created_at: string;
-  metadata: Record<string, unknown>;
+  metadata: {
+    total_amount?: number;
+    assets?: DividendAsset[];
+    payment_date?: string;
+    [key: string]: unknown;
+  };
 }
 
 export const UserNotifications = () => {
@@ -29,6 +41,7 @@ export const UserNotifications = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [animatingBell, setAnimatingBell] = useState(false);
+  const [expandedNotifications, setExpandedNotifications] = useState<Set<string>>(new Set());
   const { playNotificationSound, soundEnabled } = useSoundAlerts();
   const lastNotificationIdRef = useRef<string | null>(null);
 
@@ -140,13 +153,25 @@ export const UserNotifications = () => {
     }
   };
 
+  const toggleExpanded = (id: string) => {
+    setExpandedNotifications(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell 
             className={`h-5 w-5 transition-transform ${
-              animatingBell ? 'animate-[wiggle_0.3s_ease-in-out_2]' : ''
+              animatingBell ? 'animate-bell-ring' : ''
             }`}
             style={{
               transformOrigin: 'top center'
@@ -185,43 +210,77 @@ export const UserNotifications = () => {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`p-3 cursor-pointer hover:bg-muted/50 transition-colors ${
-                    !notification.is_read ? "bg-primary/5" : ""
-                  }`}
-                  onClick={() => !notification.is_read && markAsRead(notification.id)}
-                >
-                  <div className="flex items-start gap-3">
-                    <span
-                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm ${getNotificationColor(
-                        notification.notification_type
-                      )}`}
-                    >
-                      {getNotificationIcon(notification.notification_type)}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium truncate">
-                          {notification.title}
+              {notifications.map((notification) => {
+                const isDividend = notification.notification_type === "dividend";
+                const isExpanded = expandedNotifications.has(notification.id);
+                const dividendAssets = notification.metadata?.assets as DividendAsset[] | undefined;
+                
+                return (
+                  <div
+                    key={notification.id}
+                    className={`p-3 cursor-pointer hover:bg-muted/50 transition-colors ${
+                      !notification.is_read ? "bg-primary/5" : ""
+                    }`}
+                    onClick={() => {
+                      if (!notification.is_read) markAsRead(notification.id);
+                      if (isDividend && dividendAssets?.length) toggleExpanded(notification.id);
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm ${getNotificationColor(
+                          notification.notification_type
+                        )}`}
+                      >
+                        {getNotificationIcon(notification.notification_type)}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">
+                            {notification.title}
+                          </p>
+                          {!notification.is_read && (
+                            <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+                          )}
+                          {isDividend && dividendAssets?.length && (
+                            <span className="ml-auto text-muted-foreground">
+                              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {isDividend 
+                            ? `You received money from the dividend. Total: $${notification.metadata?.total_amount?.toFixed(2) || '0.00'}`
+                            : notification.message
+                          }
                         </p>
-                        {!notification.is_read && (
-                          <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+                        
+                        {/* Expandable dividend details */}
+                        {isDividend && isExpanded && dividendAssets && (
+                          <div className="mt-2 p-2 bg-muted/30 rounded-md space-y-1">
+                            {dividendAssets.map((asset, idx) => (
+                              <div key={idx} className="flex justify-between text-xs">
+                                <span className="text-muted-foreground">
+                                  {asset.shares.toFixed(2)} shares
+                                </span>
+                                <span className="text-success font-medium">
+                                  +${asset.amount.toFixed(2)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
                         )}
+                        
+                        <p className="text-xs text-muted-foreground/70 mt-1">
+                          {formatDistanceToNow(new Date(notification.created_at), {
+                            addSuffix: true,
+                          })}
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                        {notification.message}
-                      </p>
-                      <p className="text-xs text-muted-foreground/70 mt-1">
-                        {formatDistanceToNow(new Date(notification.created_at), {
-                          addSuffix: true,
-                        })}
-                      </p>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </ScrollArea>
