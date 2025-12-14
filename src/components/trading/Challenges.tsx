@@ -24,25 +24,31 @@ interface DayStatus {
 }
 
 export const Challenges = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [streak, setStreak] = useState(0);
   const [weekStatus, setWeekStatus] = useState<DayStatus[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
+    if (user && session?.access_token) {
       initializeChallenges();
       updateStreak();
     }
-  }, [user]);
+  }, [user, session?.access_token]);
 
   const initializeChallenges = async () => {
+    if (!session?.access_token) return;
+    
     try {
       // Generate daily challenges if needed
-      await supabase.functions.invoke('manage-daily-challenges', {
+      const { error: invokeError } = await supabase.functions.invoke('manage-daily-challenges', {
         body: { action: 'generate_daily_challenges' }
       });
+      
+      if (invokeError) {
+        console.log('Challenge generation skipped:', invokeError.message);
+      }
 
       // Get today's challenges with user progress
       const today = new Date().toISOString().split('T')[0];
@@ -90,10 +96,17 @@ export const Challenges = () => {
   };
 
   const updateStreak = async () => {
+    if (!session?.access_token) return;
+    
     try {
       const { data, error } = await supabase.functions.invoke('manage-daily-challenges', {
-        body: { action: 'update_streak', userId: user!.id }
+        body: { action: 'update_streak' }
       });
+      
+      if (error) {
+        console.log('Streak update skipped:', error.message);
+        return;
+      }
 
       if (data?.streak) {
         setStreak(data.streak);
