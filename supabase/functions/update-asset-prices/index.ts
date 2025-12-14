@@ -6,8 +6,8 @@ const corsHeaders = {
 };
 
 // Main price update logic extracted to a reusable function
-async function performPriceUpdate(supabase: any, updateIndex: number) {
-  console.log(`[Update ${updateIndex + 1}/4] Starting price update...`);
+async function performPriceUpdate(supabase: any, updateIndex: number, totalUpdates: number = 60) {
+  console.log(`[Update ${updateIndex + 1}/${totalUpdates}] Starting price update...`);
   
   // Get all active assets
   const { data: assets, error: assetsError } = await supabase
@@ -44,7 +44,7 @@ async function performPriceUpdate(supabase: any, updateIndex: number) {
 
   if (newsError) throw newsError;
 
-  console.log(`[Update ${updateIndex + 1}/4] Updating ${assets?.length || 0} assets, ${triggeredNews?.length || 0} triggered news`);
+  console.log(`[Update ${updateIndex + 1}/${totalUpdates}] Updating ${assets?.length || 0} assets, ${triggeredNews?.length || 0} triggered news`);
 
   // Process triggered news events
   const processedNewsIds: string[] = [];
@@ -103,8 +103,8 @@ async function performPriceUpdate(supabase: any, updateIndex: number) {
         const currentPrice = Number(asset.current_price);
         const originalPrice = Number(news.original_price);
         
-        // Gradually revert price back to original (adjusted for 15-second updates)
-        const reversionProgress = 0.04; // Revert 4% per 15 seconds (~15% per minute)
+        // Gradually revert price back to original (adjusted for 1-second updates)
+        const reversionProgress = 0.003; // Revert 0.3% per second (~18% per minute)
         const newPrice = currentPrice + (originalPrice - currentPrice) * reversionProgress;
         
         await supabase
@@ -139,8 +139,8 @@ async function performPriceUpdate(supabase: any, updateIndex: number) {
     
     if (hasActiveNews) continue;
     
-    // Normal small random fluctuation (adjusted for 15-second intervals)
-    let priceChange = (Math.random() - 0.5) * 0.15; // -0.075% to +0.075% per 15 seconds
+    // Normal small random fluctuation (adjusted for 1-second intervals)
+    let priceChange = (Math.random() - 0.5) * 0.02; // -0.01% to +0.01% per second
 
     // Calculate new price
     const currentPrice = Number(asset.current_price);
@@ -411,29 +411,21 @@ async function performPriceUpdate(supabase: any, updateIndex: number) {
     }
   }
 
-  console.log(`[Update ${updateIndex + 1}/4] Price update completed`);
+  console.log(`[Update ${updateIndex + 1}/${totalUpdates}] Price update completed`);
   return { assets: assets?.length || 0, news: triggeredNews?.length || 0, alerts: activeAlerts?.length || 0 };
 }
 
 // Helper function to wait
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Background task that runs 3 additional updates (at 15s, 30s, 45s)
+// Background task that runs 59 additional updates (at 1s, 2s, ... 59s)
 async function runDelayedUpdates(supabase: any) {
   try {
-    // Wait 15 seconds, then run update 2
-    await sleep(15000);
-    await performPriceUpdate(supabase, 1);
-    
-    // Wait 15 seconds, then run update 3
-    await sleep(15000);
-    await performPriceUpdate(supabase, 2);
-    
-    // Wait 15 seconds, then run update 4
-    await sleep(15000);
-    await performPriceUpdate(supabase, 3);
-    
-    console.log('All 4 price updates completed for this cycle');
+    for (let i = 1; i < 60; i++) {
+      await sleep(1000);
+      await performPriceUpdate(supabase, i, 60);
+    }
+    console.log('All 60 price updates completed for this cycle');
   } catch (error) {
     console.error('Error in delayed updates:', error);
   }
@@ -445,7 +437,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('Starting price update cycle (4 updates over 60 seconds)...');
+    console.log('Starting price update cycle (60 updates over 60 seconds - 1 per second)...');
     
     // Verify cron signature using env or DB fallback
     const signature = req.headers.get('X-Cron-Signature') || '';
@@ -487,18 +479,18 @@ Deno.serve(async (req) => {
     }
 
     // Run first update immediately
-    const result = await performPriceUpdate(supabase, 0);
+    const result = await performPriceUpdate(supabase, 0, 60);
 
-    // Schedule the remaining 3 updates as background tasks
+    // Schedule the remaining 59 updates as background tasks
     // Using EdgeRuntime.waitUntil to keep the function alive
     (globalThis as any).EdgeRuntime?.waitUntil?.(runDelayedUpdates(supabase));
 
-    console.log('First update done, background updates scheduled');
+    console.log('First update done, 59 background updates scheduled (1 per second)');
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: '4 updates scheduled over 60 seconds',
+        message: '60 updates scheduled over 60 seconds (1 per second)',
         firstUpdate: result
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

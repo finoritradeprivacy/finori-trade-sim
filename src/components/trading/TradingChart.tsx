@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 interface TradingChartProps {
   asset: any;
 }
-type Timeframe = '1m' | '5m' | '15m' | '1h' | '4h' | '1d' | '1w';
+type Timeframe = '1s' | '1m' | '5m' | '15m' | '1h' | '4h' | '1d' | '1w';
 type ChartType = 'candlestick' | 'line' | 'ohlc';
 type DrawingTool = 'none' | 'trendline' | 'horizontal' | 'rectangle' | 'text';
 interface Trade {
@@ -37,7 +37,9 @@ export const TradingChart = ({
   const priceLinesRef = useRef<any[]>([]);
   const trendlineSeriesRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
   const markersRef = useRef<any>(null);
-  const [timeframe, setTimeframe] = useState<Timeframe>('1m');
+  const [timeframe, setTimeframe] = useState<Timeframe>('1s');
+  const [timeframeCooldown, setTimeframeCooldown] = useState(0);
+  const lastTimeframeChangeRef = useRef<number>(0);
   const [chartType, setChartType] = useState<ChartType>('candlestick');
   const [drawingTool, setDrawingTool] = useState<DrawingTool>('none');
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -54,25 +56,36 @@ export const TradingChart = ({
     }>;
   } | null>(null);
   const [isLoadingData, setIsLoadingData] = useState(false);
-  const [priceCountdown, setPriceCountdown] = useState(15);
+  const [priceCountdown, setPriceCountdown] = useState(1);
 
-  // Price update countdown - calculates based on server's updated_at timestamp
+  // Price update countdown - 1 second updates
   useEffect(() => {
     const calculateCountdown = () => {
-      if (!asset?.updated_at) return 15;
+      if (!asset?.updated_at) return 1;
       const lastUpdate = new Date(asset.updated_at).getTime();
       const now = Date.now();
       const elapsed = Math.floor((now - lastUpdate) / 1000);
-      const remaining = Math.max(0, 15 - elapsed);
+      const remaining = Math.max(0, 1 - elapsed);
       return remaining;
     };
     setPriceCountdown(calculateCountdown());
     const interval = setInterval(() => {
       setPriceCountdown(calculateCountdown());
-    }, 500); // Update more frequently for accuracy
+    }, 100);
 
     return () => clearInterval(interval);
   }, [asset?.updated_at]);
+
+  // Timeframe cooldown countdown
+  useEffect(() => {
+    if (timeframeCooldown <= 0) return;
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - lastTimeframeChangeRef.current) / 1000);
+      const remaining = Math.max(0, 30 - elapsed);
+      setTimeframeCooldown(remaining);
+    }, 100);
+    return () => clearInterval(interval);
+  }, [timeframeCooldown]);
 
   // Initialize chart
   useEffect(() => {
@@ -241,6 +254,7 @@ export const TradingChart = ({
   // Get timeframe in seconds
   const getTimeframeSeconds = (tf: Timeframe): number => {
     const map: Record<Timeframe, number> = {
+      '1s': 1,
       '1m': 60,
       '5m': 300,
       '15m': 900,
@@ -250,6 +264,17 @@ export const TradingChart = ({
       '1w': 604800
     };
     return map[tf];
+  };
+
+  // Handle timeframe change with cooldown
+  const handleTimeframeChange = (newTimeframe: Timeframe) => {
+    if (timeframeCooldown > 0) {
+      toast.error(`Please wait ${timeframeCooldown}s before switching timeframes`);
+      return;
+    }
+    setTimeframe(newTimeframe);
+    lastTimeframeChangeRef.current = Date.now();
+    setTimeframeCooldown(30);
   };
 
   // Real-time price updates (subscribe to price_history for selected asset)
@@ -637,12 +662,7 @@ export const TradingChart = ({
     }
   }, [drawings, trades]);
 
-  // Handle timeframe change
-  const handleTimeframeChange = (tf: Timeframe) => {
-    setTimeframe(tf);
-    // Generate will be called by useEffect watching timeframe
-    toast.success(`Timeframe changed to ${tf}`);
-  };
+  // Note: handleTimeframeChange is defined above with cooldown logic
 
   // Generate historical data when asset changes, timeframe changes, or chart initializes
   useEffect(() => {
@@ -675,7 +695,7 @@ export const TradingChart = ({
       toast.success('Last drawing removed');
     }
   };
-  const timeframes: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d', '1w'];
+  const timeframes: Timeframe[] = ['1s', '1m', '5m', '15m', '1h', '4h', '1d', '1w'];
   return <Card className="p-0 bg-[#0B0E11] border-[#2A2E39]">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-[#2A2E39]">
@@ -694,10 +714,25 @@ export const TradingChart = ({
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 px-4 pb-3 border-b border-[#2A2E39]">
         {/* Timeframe selector */}
-        <div className="flex gap-1">
-          {timeframes.map(tf => <Button key={tf} variant={timeframe === tf ? 'default' : 'outline'} size="sm" onClick={() => handleTimeframeChange(tf)}>
-              {tf}
-            </Button>)}
+        <div className="flex gap-1 relative group">
+          {timeframes.map(tf => (
+            <div key={tf} className="relative">
+              <Button 
+                variant={timeframe === tf ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => handleTimeframeChange(tf)}
+                disabled={timeframeCooldown > 0 && timeframe !== tf}
+                className={timeframeCooldown > 0 && timeframe !== tf ? 'opacity-50 cursor-not-allowed' : ''}
+              >
+                {tf}
+              </Button>
+            </div>
+          ))}
+          {timeframeCooldown > 0 && (
+            <div className="absolute -top-8 left-0 bg-destructive text-destructive-foreground text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+              Cooldown: {timeframeCooldown}s
+            </div>
+          )}
         </div>
 
         <div className="w-px h-6 bg-border" />
