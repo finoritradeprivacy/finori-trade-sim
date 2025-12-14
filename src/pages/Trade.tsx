@@ -15,6 +15,7 @@ import NewsFeed from "@/components/trading/NewsFeed";
 import PlayerProfile from "@/components/trading/PlayerProfile";
 import { PriceAlerts } from "@/components/trading/PriceAlerts";
 import { ConnectionStatus } from "@/components/trading/ConnectionStatus";
+import MarketTicker from "@/components/trading/MarketTicker";
 
 const Trade = () => {
   const { user, loading } = useAuth();
@@ -141,6 +142,8 @@ const Trade = () => {
           </div>
         </div>
       </div>
+      
+      <MarketTicker />
     </div>
   );
 };
