@@ -653,6 +653,72 @@ export type Database = {
         }
         Relationships: []
       }
+      price_history_daily: {
+        Row: {
+          asset_id: string
+          close: number
+          created_at: string
+          high: number
+          id: string
+          low: number
+          open: number
+          time: number
+        }
+        Insert: {
+          asset_id: string
+          close: number
+          created_at?: string
+          high: number
+          id?: string
+          low: number
+          open: number
+          time: number
+        }
+        Update: {
+          asset_id?: string
+          close?: number
+          created_at?: string
+          high?: number
+          id?: string
+          low?: number
+          open?: number
+          time?: number
+        }
+        Relationships: []
+      }
+      price_history_hourly: {
+        Row: {
+          asset_id: string
+          close: number
+          created_at: string
+          high: number
+          id: string
+          low: number
+          open: number
+          time: number
+        }
+        Insert: {
+          asset_id: string
+          close: number
+          created_at?: string
+          high: number
+          id?: string
+          low: number
+          open: number
+          time: number
+        }
+        Update: {
+          asset_id?: string
+          close?: number
+          created_at?: string
+          high?: number
+          id?: string
+          low?: number
+          open?: number
+          time?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

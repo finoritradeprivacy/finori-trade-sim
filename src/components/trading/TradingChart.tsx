@@ -202,78 +202,178 @@ export const TradingChart = ({
     return Array.from(aggregated.values()).sort((a, b) => (a.time as number) - (b.time as number));
   };
 
+  // Define candle limits per timeframe: [min, max]
+  const getCandleLimits = (tf: Timeframe): [number, number] => {
+    switch (tf) {
+      case '1s': return [2000, 2000];
+      case '1m': return [2000, 2000];
+      case '15m': return [1000, 1750];
+      case '5m': return [1000, 1750];
+      case '1h': return [500, 1500];
+      case '4h': return [300, 500];
+      case '1d': return [100, 400];
+      case '1w': return [15, 60];
+      default: return [100, 500];
+    }
+  };
+
+  // Determine which table to use for each timeframe
+  const getTableForTimeframe = (tf: Timeframe): string => {
+    switch (tf) {
+      case '1s':
+      case '1m':
+      case '5m':
+      case '15m':
+        return 'price_history'; // Use 1m candles and aggregate
+      case '1h':
+      case '4h':
+        return 'price_history_hourly'; // Use hourly candles
+      case '1d':
+      case '1w':
+        return 'price_history_daily'; // Use daily candles
+      default:
+        return 'price_history';
+    }
+  };
+
   // Generate historical candlestick data
   const generateHistoricalData = async () => {
     if (!candlestickSeriesRef.current || !asset) return;
     setIsLoadingData(true);
     const timeframeSeconds = getTimeframeSeconds(timeframe);
     const now = Math.floor(Date.now() / 1000);
+    const [minCandles, maxCandles] = getCandleLimits(timeframe);
+    const tableName = getTableForTimeframe(timeframe);
     
-    // Calculate how many 1m candles we need based on timeframe
-    // For higher timeframes, we need more historical data
-    let candlesNeeded: number;
-    switch (timeframe) {
-      case '1s':
-        candlesNeeded = 60; // 1 hour of seconds
-        break;
-      case '1m':
-        candlesNeeded = 1440; // 24 hours
-        break;
-      case '5m':
-        candlesNeeded = 2880; // 10 days
-        break;
-      case '15m':
-        candlesNeeded = 4320; // 15 days
-        break;
-      case '1h':
-        candlesNeeded = 10080; // 7 days
-        break;
-      case '4h':
-        candlesNeeded = 20160; // 14 days
-        break;
-      case '1d':
-        candlesNeeded = 43200; // 30 days
-        break;
-      case '1w':
-        candlesNeeded = 129600; // 90 days
-        break;
-      default:
-        candlesNeeded = 1440;
-    }
-    
-    const startTime = now - candlesNeeded * 60;
     try {
-      // Load 1m candles from database
-      const {
-        data: existingData,
-        error
-      } = await supabase.from('price_history').select('*').eq('asset_id', asset.id).gte('time', startTime).order('time', {
-        ascending: true
-      }).limit(50000);
-      if (error) throw error;
-      if (existingData && existingData.length > 0) {
-        const rawData = existingData.map(d => ({
-          time: Number(d.time),
-          open: Number(d.open),
-          high: Number(d.high),
-          low: Number(d.low),
-          close: Number(d.close)
-        }));
-
-        // Aggregate candles based on selected timeframe
-        const chartData = aggregateCandles(rawData, timeframeSeconds);
+      let chartData: CandlestickData[] = [];
+      
+      if (tableName === 'price_history') {
+        // For 1m-based timeframes, load raw 1m candles and aggregate
+        const candlesNeeded = maxCandles * (timeframeSeconds / 60) * 1.5; // Extra buffer for aggregation
+        const startTime = now - candlesNeeded * 60;
+        
+        const { data: existingData, error } = await supabase
+          .from('price_history')
+          .select('*')
+          .eq('asset_id', asset.id)
+          .gte('time', startTime)
+          .order('time', { ascending: true })
+          .limit(50000);
+        
+        if (error) throw error;
+        
+        if (existingData && existingData.length > 0) {
+          const rawData = existingData.map(d => ({
+            time: Number(d.time),
+            open: Number(d.open),
+            high: Number(d.high),
+            low: Number(d.low),
+            close: Number(d.close)
+          }));
+          
+          // Aggregate candles based on selected timeframe
+          const aggregated = aggregateCandles(rawData, timeframeSeconds);
+          
+          // Apply max limit
+          chartData = aggregated.slice(-maxCandles);
+          console.log(`Loaded ${existingData.length} 1m candles, aggregated to ${chartData.length} ${timeframe} candles`);
+        }
+      } else if (tableName === 'price_history_hourly') {
+        // For hourly-based timeframes (1h, 4h)
+        const candlesNeeded = timeframe === '4h' 
+          ? maxCandles * 4 // Need 4x hourly candles for 4h aggregation
+          : maxCandles;
+        
+        const { data: hourlyData, error } = await supabase
+          .from('price_history_hourly')
+          .select('*')
+          .eq('asset_id', asset.id)
+          .order('time', { ascending: false })
+          .limit(candlesNeeded);
+        
+        if (error) throw error;
+        
+        if (hourlyData && hourlyData.length > 0) {
+          const rawData = hourlyData.reverse().map(d => ({
+            time: Number(d.time),
+            open: Number(d.open),
+            high: Number(d.high),
+            low: Number(d.low),
+            close: Number(d.close)
+          }));
+          
+          if (timeframe === '4h') {
+            // Aggregate hourly to 4h
+            const aggregated = aggregateCandles(rawData, 14400);
+            chartData = aggregated.slice(-maxCandles);
+          } else {
+            chartData = rawData.slice(-maxCandles).map(d => ({
+              time: d.time as UTCTimestamp,
+              open: d.open,
+              high: d.high,
+              low: d.low,
+              close: d.close
+            }));
+          }
+          console.log(`Loaded ${hourlyData.length} hourly candles, result: ${chartData.length} ${timeframe} candles`);
+        }
+      } else if (tableName === 'price_history_daily') {
+        // For daily-based timeframes (1d, 1w)
+        const candlesNeeded = timeframe === '1w'
+          ? maxCandles * 7 // Need 7x daily candles for weekly aggregation
+          : maxCandles;
+        
+        const { data: dailyData, error } = await supabase
+          .from('price_history_daily')
+          .select('*')
+          .eq('asset_id', asset.id)
+          .order('time', { ascending: false })
+          .limit(candlesNeeded);
+        
+        if (error) throw error;
+        
+        if (dailyData && dailyData.length > 0) {
+          const rawData = dailyData.reverse().map(d => ({
+            time: Number(d.time),
+            open: Number(d.open),
+            high: Number(d.high),
+            low: Number(d.low),
+            close: Number(d.close)
+          }));
+          
+          if (timeframe === '1w') {
+            // Aggregate daily to weekly
+            const aggregated = aggregateCandles(rawData, 604800);
+            chartData = aggregated.slice(-maxCandles);
+          } else {
+            chartData = rawData.slice(-maxCandles).map(d => ({
+              time: d.time as UTCTimestamp,
+              open: d.open,
+              high: d.high,
+              low: d.low,
+              close: d.close
+            }));
+          }
+          console.log(`Loaded ${dailyData.length} daily candles, result: ${chartData.length} ${timeframe} candles`);
+        }
+      }
+      
+      // Ensure minimum candles requirement is met (log warning if not)
+      if (chartData.length < minCandles && chartData.length > 0) {
+        console.warn(`Only ${chartData.length} candles available for ${timeframe}, minimum is ${minCandles}`);
+      }
+      
+      if (chartData.length > 0) {
         candlestickSeriesRef.current.setData(chartData);
         setLastCandle(chartData[chartData.length - 1] || null);
-        console.log(`Loaded ${existingData.length} 1m candles, aggregated to ${chartData.length} ${timeframe} candles`);
       } else {
-        // No pre-generated history: start empty and let realtime build from now
         candlestickSeriesRef.current.setData([]);
         setLastCandle(null);
         console.log('No history yet — will build from now');
       }
     } catch (error) {
       console.error('Error loading price history:', error);
-      // No fallback history generation; start empty
       candlestickSeriesRef.current.setData([]);
       setLastCandle(null);
     } finally {

@@ -276,6 +276,89 @@ async function performPriceUpdate(supabase: any, updateIndex: number, totalUpdat
     }
   }
 
+  // Aggregate to hourly table every minute (on minute 0 of hour, aggregate previous hour)
+  const currentMinute = new Date().getUTCMinutes();
+  if (currentMinute === 0 && updateIndex === 0) {
+    const hourAgo = Math.floor((Date.now() - 3600000) / 1000 / 3600) * 3600;
+    const hourEnd = hourAgo + 3600;
+    
+    for (const asset of assets || []) {
+      // Fetch all 1m candles for the past hour
+      const { data: hourCandles, error: hourError } = await supabase
+        .from('price_history')
+        .select('open, high, low, close, time')
+        .eq('asset_id', asset.id)
+        .gte('time', hourAgo)
+        .lt('time', hourEnd)
+        .order('time', { ascending: true });
+      
+      if (hourError || !hourCandles || hourCandles.length === 0) continue;
+      
+      const hourlyCandle = {
+        asset_id: asset.id,
+        time: hourAgo,
+        open: Number(hourCandles[0].open),
+        high: Math.max(...hourCandles.map((c: any) => Number(c.high))),
+        low: Math.min(...hourCandles.map((c: any) => Number(c.low))),
+        close: Number(hourCandles[hourCandles.length - 1].close)
+      };
+      
+      await supabase.from('price_history_hourly').upsert(hourlyCandle, { onConflict: 'asset_id,time' });
+    }
+    console.log('Aggregated hourly candles');
+  }
+
+  // Aggregate to daily table at midnight UTC (on hour 0, aggregate previous day)
+  const currentHour = new Date().getUTCHours();
+  if (currentHour === 0 && currentMinute === 0 && updateIndex === 0) {
+    const dayAgo = Math.floor((Date.now() - 86400000) / 1000 / 86400) * 86400;
+    const dayEnd = dayAgo + 86400;
+    
+    for (const asset of assets || []) {
+      // Fetch all hourly candles for the past day
+      const { data: dayCandles, error: dayError } = await supabase
+        .from('price_history_hourly')
+        .select('open, high, low, close, time')
+        .eq('asset_id', asset.id)
+        .gte('time', dayAgo)
+        .lt('time', dayEnd)
+        .order('time', { ascending: true });
+      
+      if (dayError || !dayCandles || dayCandles.length === 0) continue;
+      
+      const dailyCandle = {
+        asset_id: asset.id,
+        time: dayAgo,
+        open: Number(dayCandles[0].open),
+        high: Math.max(...dayCandles.map((c: any) => Number(c.high))),
+        low: Math.min(...dayCandles.map((c: any) => Number(c.low))),
+        close: Number(dayCandles[dayCandles.length - 1].close)
+      };
+      
+      await supabase.from('price_history_daily').upsert(dailyCandle, { onConflict: 'asset_id,time' });
+    }
+    console.log('Aggregated daily candles');
+    
+    // Cleanup old 1m candles (older than 2 days)
+    const twoDaysAgo = Math.floor(Date.now() / 1000) - (2 * 86400);
+    const { error: cleanupError, count: deletedCount } = await supabase
+      .from('price_history')
+      .delete()
+      .lt('time', twoDaysAgo);
+    
+    if (!cleanupError && deletedCount) {
+      console.log(`Cleaned up ${deletedCount} old 1m candles`);
+    }
+    
+    // Cleanup old hourly candles (older than 120 days)
+    const fourMonthsAgo = Math.floor(Date.now() / 1000) - (120 * 86400);
+    await supabase.from('price_history_hourly').delete().lt('time', fourMonthsAgo);
+    
+    // Cleanup old daily candles (older than 400 days)
+    const fourHundredDaysAgo = Math.floor(Date.now() / 1000) - (400 * 86400);
+    await supabase.from('price_history_daily').delete().lt('time', fourHundredDaysAgo);
+  }
+
   // Process pending limit and stop orders
   const { data: pendingOrders, error: ordersError } = await supabase
     .from('orders')

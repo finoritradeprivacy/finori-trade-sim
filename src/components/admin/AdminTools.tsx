@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { 
   Bug, UserCog, TestTube, Zap, TrendingUp, TrendingDown, 
-  RefreshCw, Play, AlertTriangle
+  RefreshCw, Play, AlertTriangle, Database
 } from 'lucide-react';
 
 export const AdminTools = () => {
@@ -239,6 +239,7 @@ export const AdminTools = () => {
   };
 
   const [isGeneratingNews, setIsGeneratingNews] = useState(false);
+  const [isGeneratingHistory, setIsGeneratingHistory] = useState(false);
 
   const handleTriggerNewsGeneration = async () => {
     setIsGeneratingNews(true);
@@ -266,6 +267,29 @@ export const AdminTools = () => {
       toast.error(error.message || 'Failed to trigger news generation');
     } finally {
       setIsGeneratingNews(false);
+    }
+  };
+
+  const handleGeneratePriceHistory = async () => {
+    setIsGeneratingHistory(true);
+    toast.info('Generating 4 months of price history for all assets... This may take several minutes.');
+    try {
+      const response = await supabase.functions.invoke('generate-price-history');
+      
+      if (response.error) throw response.error;
+
+      toast.success(response.data?.message || 'Price history generation complete!');
+
+      await supabase.rpc('log_admin_action', {
+        p_action_type: 'generate_price_history',
+        p_entity_type: 'market',
+        p_details: { success: true }
+      });
+    } catch (error: any) {
+      console.error('Error generating price history:', error);
+      toast.error(error.message || 'Failed to generate price history (may still be running in background)');
+    } finally {
+      setIsGeneratingHistory(false);
     }
   };
 
@@ -444,6 +468,15 @@ export const AdminTools = () => {
                 >
                   <Zap className={`h-4 w-4 mr-2 ${isGeneratingNews ? 'animate-spin' : ''}`} />
                   {isGeneratingNews ? 'Generating...' : 'Generate Market News'}
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={handleGeneratePriceHistory}
+                  disabled={isGeneratingHistory}
+                  className="col-span-2"
+                >
+                  <Database className={`h-4 w-4 mr-2 ${isGeneratingHistory ? 'animate-spin' : ''}`} />
+                  {isGeneratingHistory ? 'Generating 4-month history...' : 'Generate 4-Month Price History'}
                 </Button>
               </div>
             </CardContent>
