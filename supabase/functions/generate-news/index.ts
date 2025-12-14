@@ -13,29 +13,85 @@ interface Asset {
   asset_type: string;
 }
 
+// HMAC verification for cron job authentication
+async function verifyHmacSignature(payload: string, signature: string, secret: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signatureBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+  const expectedSignature = Array.from(new Uint8Array(signatureBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  return signature === expectedSignature;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Verify authentication
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { 
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log('Starting news generation cycle...');
+    // Verify HMAC signature for cron job authentication
+    const signature = req.headers.get('x-cron-signature');
+    const timestamp = req.headers.get('x-cron-timestamp');
+    
+    if (!signature || !timestamp) {
+      console.error('Missing cron signature or timestamp');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Missing authentication headers' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check timestamp to prevent replay attacks (5 minute window)
+    const requestTime = parseInt(timestamp, 10);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    if (Math.abs(nowSeconds - requestTime) > 300) {
+      console.error('Timestamp outside valid window');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Request expired' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get cron secret from database
+    const { data: configData } = await supabase
+      .from('system_config')
+      .select('value')
+      .eq('key', 'cron_secret')
+      .single();
+    
+    const cronSecret = configData?.value || Deno.env.get('CRON_SECRET');
+    if (!cronSecret) {
+      console.error('Cron secret not configured');
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify signature
+    const payload = `${timestamp}.generate-news`;
+    const isValid = await verifyHmacSignature(payload, signature, cronSecret);
+    if (!isValid) {
+      console.error('Invalid cron signature');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized: Invalid signature' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('HMAC signature verified, starting news generation...');
 
     // Check if we're in quiet hours (22:00-6:00 CET)
     const now = new Date();
