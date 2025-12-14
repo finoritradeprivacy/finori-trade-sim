@@ -5,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Main price update logic extracted to a reusable function
+// Main price update logic - OPTIMIZED with batch operations
 async function performPriceUpdate(supabase: any, updateIndex: number, totalUpdates: number = 60) {
   console.log(`[Update ${updateIndex + 1}/${totalUpdates}] Starting price update...`);
   
@@ -131,6 +131,44 @@ async function performPriceUpdate(supabase: any, updateIndex: number, totalUpdat
     }
   }
 
+  // OPTIMIZED: Batch fetch 24h old prices for all assets in ONE query
+  const twentyFourHoursAgo = Math.floor(Date.now() / 1000) - 86400;
+  const assetIds = (assets || []).map((a: any) => a.id);
+  
+  // Get the most recent price before 24h ago for each asset
+  const { data: oldPricesData } = await supabase
+    .from('price_history')
+    .select('asset_id, close, time')
+    .in('asset_id', assetIds)
+    .lte('time', twentyFourHoursAgo)
+    .order('time', { ascending: false });
+
+  // Build a map of asset_id -> old price (first occurrence = most recent)
+  const oldPriceMap = new Map<string, number>();
+  for (const row of oldPricesData || []) {
+    if (!oldPriceMap.has(row.asset_id)) {
+      oldPriceMap.set(row.asset_id, Number(row.close));
+    }
+  }
+
+  // OPTIMIZED: Batch fetch existing candles for current minute
+  const candleTime = Math.floor(Date.now() / 1000 / 60) * 60;
+  const { data: existingCandles } = await supabase
+    .from('price_history')
+    .select('id, asset_id, open, high, low, close')
+    .in('asset_id', assetIds)
+    .eq('time', candleTime);
+
+  const candleMap = new Map<string, any>();
+  for (const candle of existingCandles || []) {
+    candleMap.set(candle.asset_id, candle);
+  }
+
+  // Prepare batch updates
+  const assetUpdates: any[] = [];
+  const candleUpdates: any[] = [];
+  const candleInserts: any[] = [];
+
   // Update each asset with normal fluctuations
   for (const asset of assets || []) {
     // Skip assets currently under news impact or reversion
@@ -140,84 +178,77 @@ async function performPriceUpdate(supabase: any, updateIndex: number, totalUpdat
     if (hasActiveNews) continue;
     
     // Normal small random fluctuation (adjusted for 1-second intervals)
-    let priceChange = (Math.random() - 0.5) * 0.02; // -0.01% to +0.01% per second
+    const priceChange = (Math.random() - 0.5) * 0.02; // -0.01% to +0.01% per second
 
     // Calculate new price
     const currentPrice = Number(asset.current_price);
     const newPrice = currentPrice * (1 + priceChange / 100);
     
-    // Calculate actual 24h change from price history
-    const twentyFourHoursAgo = Math.floor(Date.now() / 1000) - 86400;
-    const { data: oldPriceData } = await supabase
-      .from('price_history')
-      .select('close')
-      .eq('asset_id', asset.id)
-      .lte('time', twentyFourHoursAgo)
-      .order('time', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    
+    // Calculate actual 24h change from pre-fetched data
+    const oldPrice = oldPriceMap.get(asset.id);
     let new24hChange = 0;
-    if (oldPriceData && oldPriceData.close) {
-      const oldPrice = Number(oldPriceData.close);
+    if (oldPrice) {
       new24hChange = (newPrice - oldPrice) / oldPrice; // Stored as decimal (0.01 = 1%)
     }
 
-    // Maintain 1m OHLC candle in price_history
-    const candleTime = Math.floor(Date.now() / 1000 / 60) * 60;
+    // Prepare asset update
+    assetUpdates.push({
+      id: asset.id,
+      current_price: newPrice,
+      price_change_24h: new24hChange,
+      updated_at: new Date().toISOString(),
+    });
 
-    const { data: existingCandle, error: selectCandleError } = await supabase
-      .from('price_history')
-      .select('id, open, high, low, close')
-      .eq('asset_id', asset.id)
-      .eq('time', candleTime)
-      .maybeSingle();
-
-    if (selectCandleError && selectCandleError.code !== 'PGRST116') {
-      console.error(`Error selecting candle for ${asset.symbol}:`, selectCandleError);
-    }
-
+    // Handle candle update/insert
+    const existingCandle = candleMap.get(asset.id);
     if (existingCandle) {
-      const { error: candleUpdateError } = await supabase
-        .from('price_history')
-        .update({
-          high: Math.max(Number(existingCandle.high), newPrice),
-          low: Math.min(Number(existingCandle.low), newPrice),
-          close: newPrice,
-        })
-        .eq('id', existingCandle.id);
-      if (candleUpdateError) {
-        console.error(`Error updating candle for ${asset.symbol}:`, candleUpdateError);
-      }
+      candleUpdates.push({
+        id: existingCandle.id,
+        high: Math.max(Number(existingCandle.high), newPrice),
+        low: Math.min(Number(existingCandle.low), newPrice),
+        close: newPrice,
+      });
     } else {
       const open = currentPrice;
-      const { error: candleInsertError } = await supabase
-        .from('price_history')
-        .insert({
-          asset_id: asset.id,
-          time: candleTime,
-          open,
-          high: Math.max(open, newPrice),
-          low: Math.min(open, newPrice),
-          close: newPrice,
-        });
-      if (candleInsertError) {
-        console.error(`Error inserting candle for ${asset.symbol}:`, candleInsertError);
-      }
+      candleInserts.push({
+        asset_id: asset.id,
+        time: candleTime,
+        open,
+        high: Math.max(open, newPrice),
+        low: Math.min(open, newPrice),
+        close: newPrice,
+      });
     }
+  }
 
-    // Update the asset
-    const { error: updateError } = await supabase
+  // OPTIMIZED: Execute batch operations
+  if (assetUpdates.length > 0) {
+    // Batch update assets using upsert
+    const { error: batchUpdateError } = await supabase
       .from('assets')
-      .update({
-        current_price: newPrice,
-        price_change_24h: new24hChange,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', asset.id);
+      .upsert(assetUpdates, { onConflict: 'id' });
+    
+    if (batchUpdateError) {
+      console.error('Batch asset update error:', batchUpdateError);
+    }
+  }
 
-    if (updateError) {
-      console.error(`Error updating ${asset.symbol}:`, updateError);
+  // Update existing candles in batch
+  for (const update of candleUpdates) {
+    await supabase
+      .from('price_history')
+      .update({ high: update.high, low: update.low, close: update.close })
+      .eq('id', update.id);
+  }
+
+  // Insert new candles in batch
+  if (candleInserts.length > 0) {
+    const { error: candleInsertError } = await supabase
+      .from('price_history')
+      .insert(candleInserts);
+    
+    if (candleInsertError) {
+      console.error('Batch candle insert error:', candleInsertError);
     }
   }
 
@@ -229,8 +260,14 @@ async function performPriceUpdate(supabase: any, updateIndex: number, totalUpdat
     .in('order_type', ['limit', 'stop']);
 
   if (!ordersError && pendingOrders && pendingOrders.length > 0) {
+    // Refresh assets with updated prices
+    const { data: updatedAssets } = await supabase
+      .from('assets')
+      .select('*')
+      .eq('is_active', true);
+    
     for (const order of pendingOrders) {
-      const asset = assets?.find((a: any) => a.id === order.asset_id);
+      const asset = updatedAssets?.find((a: any) => a.id === order.asset_id);
       if (!asset) continue;
 
       const currentPrice = Number(asset.current_price);
@@ -380,8 +417,14 @@ async function performPriceUpdate(supabase: any, updateIndex: number, totalUpdat
     .eq('is_active', true);
 
   if (!alertsError && activeAlerts && activeAlerts.length > 0) {
+    // Refresh assets one more time for alerts
+    const { data: latestAssets } = await supabase
+      .from('assets')
+      .select('*')
+      .eq('is_active', true);
+    
     for (const alert of activeAlerts) {
-      const asset = assets?.find((a: any) => a.id === alert.asset_id);
+      const asset = latestAssets?.find((a: any) => a.id === alert.asset_id);
       if (!asset) continue;
 
       const currentPrice = Number(asset.current_price);
