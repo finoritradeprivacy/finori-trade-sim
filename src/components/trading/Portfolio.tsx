@@ -28,7 +28,8 @@ const Portfolio = () => {
 
     fetchPortfolio();
 
-    const channel = supabase
+    // Subscribe to portfolio changes
+    const portfolioChannel = supabase
       .channel('portfolio-changes')
       .on(
         'postgres_changes',
@@ -44,8 +45,25 @@ const Portfolio = () => {
       )
       .subscribe();
 
+    // Subscribe to asset price changes for real-time P&L updates
+    const assetsChannel = supabase
+      .channel('assets-price-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'assets'
+        },
+        () => {
+          fetchPortfolio();
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(portfolioChannel);
+      supabase.removeChannel(assetsChannel);
     };
   }, [user]);
 

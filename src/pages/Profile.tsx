@@ -94,12 +94,14 @@ const Profile = () => {
   const handleResetPortfolio = async () => {
     if (!user) return;
     try {
-      // Delete all orders, trades, and portfolio entries
-      await Promise.all([
-        supabase.from("orders").delete().eq("user_id", user.id),
-        supabase.from("trades").delete().eq("user_id", user.id),
-        supabase.from("portfolios").delete().eq("user_id", user.id)
-      ]);
+      // First delete trades (they reference orders)
+      await supabase.from("trades").delete().eq("user_id", user.id);
+      
+      // Then delete orders
+      await supabase.from("orders").delete().eq("user_id", user.id);
+      
+      // Then delete portfolios
+      await supabase.from("portfolios").delete().eq("user_id", user.id);
 
       // Reset balance to initial amount
       await supabase.from("user_balances").update({

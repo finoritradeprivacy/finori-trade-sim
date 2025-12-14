@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatDistanceToNow } from "date-fns";
+import { useSoundAlerts } from "@/hooks/useSoundAlerts";
 
 interface Notification {
   id: string;
@@ -27,6 +28,9 @@ export const UserNotifications = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
+  const [animatingBell, setAnimatingBell] = useState(false);
+  const { playNotificationSound, soundEnabled } = useSoundAlerts();
+  const lastNotificationIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -60,8 +64,18 @@ export const UserNotifications = () => {
         },
         (payload) => {
           const newNotif = payload.new as Notification;
+          
+          // Avoid duplicate notifications
+          if (lastNotificationIdRef.current === newNotif.id) return;
+          lastNotificationIdRef.current = newNotif.id;
+          
           setNotifications((prev) => [newNotif, ...prev.slice(0, 19)]);
           setUnreadCount((prev) => prev + 1);
+          
+          // Play sound and animate
+          playNotificationSound();
+          setAnimatingBell(true);
+          setTimeout(() => setAnimatingBell(false), 600);
         }
       )
       .subscribe();
@@ -130,10 +144,19 @@ export const UserNotifications = () => {
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
+          <Bell 
+            className={`h-5 w-5 transition-transform ${
+              animatingBell ? 'animate-[wiggle_0.3s_ease-in-out_2]' : ''
+            }`}
+            style={{
+              transformOrigin: 'top center'
+            }}
+          />
           {unreadCount > 0 && (
             <Badge
-              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary"
+              className={`absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary ${
+                animatingBell ? 'animate-pulse' : ''
+              }`}
               variant="default"
             >
               {unreadCount > 9 ? "9+" : unreadCount}

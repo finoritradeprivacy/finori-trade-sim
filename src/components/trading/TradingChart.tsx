@@ -358,6 +358,7 @@ export const TradingChart = ({
   // Load trades for current asset
   useEffect(() => {
     if (!asset) return;
+    
     const loadTrades = async () => {
       const {
         data: {
@@ -376,18 +377,46 @@ export const TradingChart = ({
         return;
       }
       if (data) {
-        const formattedTrades: Trade[] = data.map(trade => ({
-          id: trade.id,
-          type: trade.side as 'buy' | 'sell',
-          price: trade.price,
-          amount: trade.quantity,
-          timestamp: new Date(trade.created_at).getTime() / 1000
-        }));
-        setTrades(formattedTrades);
+        // Deduplicate trades by id
+        const uniqueTrades = new Map<string, Trade>();
+        data.forEach(trade => {
+          if (!uniqueTrades.has(trade.id)) {
+            uniqueTrades.set(trade.id, {
+              id: trade.id,
+              type: trade.side as 'buy' | 'sell',
+              price: trade.price,
+              amount: trade.quantity,
+              timestamp: new Date(trade.created_at).getTime() / 1000
+            });
+          }
+        });
+        setTrades(Array.from(uniqueTrades.values()));
       }
     };
+    
     loadTrades();
-  }, [asset]);
+    
+    // Subscribe to new trades for this asset
+    const channel = supabase
+      .channel(`trades-${asset.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'trades',
+          filter: `asset_id=eq.${asset.id}`
+        },
+        () => {
+          loadTrades();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [asset?.id]);
 
   // Note: Trade markers are now rendered together with drawings in the render drawings effect
 
