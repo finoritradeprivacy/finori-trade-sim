@@ -80,7 +80,7 @@ export const TradingChart = ({
     if (timeframeCooldown <= 0) return;
     const interval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - lastTimeframeChangeRef.current) / 1000);
-      const remaining = Math.max(0, 30 - elapsed);
+      const remaining = Math.max(0, 20 - elapsed);
       setTimeframeCooldown(remaining);
     }, 100);
     return () => clearInterval(interval);
@@ -304,7 +304,7 @@ export const TradingChart = ({
     }
     setTimeframe(newTimeframe);
     lastTimeframeChangeRef.current = Date.now();
-    setTimeframeCooldown(30);
+    setTimeframeCooldown(20);
   };
 
   // Real-time price updates (subscribe to price_history for selected asset)
