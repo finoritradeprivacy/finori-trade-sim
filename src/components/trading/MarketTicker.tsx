@@ -37,15 +37,9 @@ const MarketTicker = () => {
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'assets' },
-        (payload) => {
-          setAssets(prev => {
-            const updated = prev.map(asset => 
-              asset.id === payload.new.id ? { ...asset, ...payload.new } : asset
-            );
-            return updated.sort((a, b) => 
-              Math.abs(b.price_change_24h || 0) - Math.abs(a.price_change_24h || 0)
-            );
-          });
+        () => {
+          // Refetch all assets to get updated top movers
+          fetchAssets();
         }
       )
       .subscribe();
