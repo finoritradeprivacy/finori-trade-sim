@@ -10,22 +10,15 @@ interface Asset {
   price_change_24h: number | null;
 }
 
-interface TickerItem {
-  key: string;
-  asset: Asset;
-  position: number;
-}
-
-const ITEM_WIDTH = 200; // Approximate width of each ticker item in pixels
-const SCROLL_SPEED = 50; // Pixels per second
+const SCROLL_SPEED = 60; // Pixels per second
 
 const MarketTicker = () => {
-  const [tickerItems, setTickerItems] = useState<TickerItem[]>([]);
-  const pendingAssetsRef = useRef<Asset[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [scrollPosition, setScrollPosition] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
-  const itemCounterRef = useRef<number>(0);
 
   const fetchAssets = useCallback(async () => {
     const { data } = await supabase
@@ -43,34 +36,12 @@ const MarketTicker = () => {
     return [];
   }, []);
 
-  // Initialize ticker items
+  // Initialize and subscribe to updates
   useEffect(() => {
-    const initTicker = async () => {
-      const assets = await fetchAssets();
-      if (assets.length === 0) return;
+    fetchAssets().then(data => {
+      if (data.length > 0) setAssets(data);
+    });
 
-      const containerWidth = containerRef.current?.offsetWidth || window.innerWidth;
-      const itemsNeeded = Math.ceil(containerWidth / ITEM_WIDTH) + 2;
-      
-      const initialItems: TickerItem[] = [];
-      for (let i = 0; i < itemsNeeded; i++) {
-        const asset = assets[i % assets.length];
-        initialItems.push({
-          key: `item-${itemCounterRef.current++}`,
-          asset,
-          position: i * ITEM_WIDTH,
-        });
-      }
-      
-      setTickerItems(initialItems);
-      pendingAssetsRef.current = assets;
-    };
-
-    initTicker();
-  }, [fetchAssets]);
-
-  // Subscribe to real-time updates
-  useEffect(() => {
     const channel = supabase
       .channel('ticker-updates')
       .on(
@@ -78,27 +49,17 @@ const MarketTicker = () => {
         { event: 'UPDATE', schema: 'public', table: 'assets' },
         (payload) => {
           // Update prices for currently displayed assets
-          setTickerItems(prev => 
-            prev.map(item => 
-              item.asset.id === payload.new.id 
+          setAssets(prev => 
+            prev.map(asset => 
+              asset.id === payload.new.id 
                 ? { 
-                    ...item, 
-                    asset: { 
-                      ...item.asset, 
-                      current_price: payload.new.current_price, 
-                      price_change_24h: payload.new.price_change_24h 
-                    }
+                    ...asset, 
+                    current_price: payload.new.current_price, 
+                    price_change_24h: payload.new.price_change_24h 
                   }
-                : item
+                : asset
             )
           );
-          
-          // Update pending assets for future replacements
-          fetchAssets().then(newAssets => {
-            if (newAssets.length > 0) {
-              pendingAssetsRef.current = newAssets;
-            }
-          });
         }
       )
       .subscribe();
@@ -108,8 +69,10 @@ const MarketTicker = () => {
     };
   }, [fetchAssets]);
 
-  // Animation loop
+  // Simple CSS-based animation with scroll position tracking
   useEffect(() => {
+    if (assets.length === 0) return;
+
     const animate = (currentTime: number) => {
       if (lastTimeRef.current === 0) {
         lastTimeRef.current = currentTime;
@@ -119,44 +82,16 @@ const MarketTicker = () => {
       lastTimeRef.current = currentTime;
       
       const movement = SCROLL_SPEED * deltaTime;
+      const contentWidth = contentRef.current?.scrollWidth || 0;
+      const halfWidth = contentWidth / 2;
 
-      setTickerItems(prev => {
-        const containerWidth = containerRef.current?.offsetWidth || window.innerWidth;
-        const updated: TickerItem[] = [];
-        let needsNewItem = false;
-        let rightmostPosition = -Infinity;
-
-        // Move items and find rightmost position
-        for (const item of prev) {
-          const newPosition = item.position - movement;
-          rightmostPosition = Math.max(rightmostPosition, item.position);
-          
-          // If item is off-screen to the left, mark for removal
-          if (newPosition < -ITEM_WIDTH) {
-            needsNewItem = true;
-            continue;
-          }
-          
-          updated.push({
-            ...item,
-            position: newPosition,
-          });
+      setScrollPosition(prev => {
+        const newPos = prev + movement;
+        // Reset when we've scrolled past the first set of items
+        if (newPos >= halfWidth) {
+          return newPos - halfWidth;
         }
-
-        // Add new item on the right when one leaves
-        if (needsNewItem && pendingAssetsRef.current.length > 0) {
-          // Find the next asset to show (cycle through pending assets)
-          const nextAssetIndex = itemCounterRef.current % pendingAssetsRef.current.length;
-          const nextAsset = pendingAssetsRef.current[nextAssetIndex];
-          
-          updated.push({
-            key: `item-${itemCounterRef.current++}`,
-            asset: nextAsset,
-            position: rightmostPosition,
-          });
-        }
-
-        return updated;
+        return newPos;
       });
 
       animationRef.current = requestAnimationFrame(animate);
@@ -169,7 +104,7 @@ const MarketTicker = () => {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, []);
+  }, [assets.length]);
 
   const formatPrice = (price: number) => {
     if (price >= 1000) return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -184,31 +119,43 @@ const MarketTicker = () => {
     return `${sign}${percentValue.toFixed(2)}%`;
   };
 
+  if (assets.length === 0) {
+    return null;
+  }
+
+  // Duplicate items for seamless loop
+  const tickerItems = [...assets, ...assets];
+
   return (
     <div 
       ref={containerRef}
-      className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t border-border z-50 overflow-hidden h-10"
+      className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t border-border z-50 overflow-hidden"
     >
-      {tickerItems.map((item) => {
-        const isPositive = (item.asset.price_change_24h || 0) >= 0;
-        return (
-          <div
-            key={item.key}
-            className="absolute flex items-center gap-2 px-4 py-2 whitespace-nowrap border-r border-border/50 h-full"
-            style={{ 
-              transform: `translateX(${item.position}px)`,
-              willChange: 'transform',
-            }}
-          >
-            <span className="font-semibold text-foreground text-sm">{item.asset.symbol}</span>
-            <span className="text-muted-foreground text-sm">${formatPrice(item.asset.current_price)}</span>
-            <span className={`flex items-center gap-1 font-medium text-sm ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-              {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              {formatChange(item.asset.price_change_24h)}
-            </span>
-          </div>
-        );
-      })}
+      <div 
+        ref={contentRef}
+        className="flex whitespace-nowrap"
+        style={{ 
+          transform: `translateX(-${scrollPosition}px)`,
+          willChange: 'transform',
+        }}
+      >
+        {tickerItems.map((asset, index) => {
+          const isPositive = (asset.price_change_24h || 0) >= 0;
+          return (
+            <div
+              key={`${asset.id}-${index}`}
+              className="flex items-center gap-2 px-6 py-2 border-r border-border/50"
+            >
+              <span className="font-semibold text-foreground">{asset.symbol}</span>
+              <span className="text-muted-foreground">${formatPrice(asset.current_price)}</span>
+              <span className={`flex items-center gap-1 font-medium ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                {formatChange(asset.price_change_24h)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
