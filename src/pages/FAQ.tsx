@@ -36,7 +36,7 @@ const faqItems = [
   },
   {
     question: "How does the leveling system work?",
-    answer: "You earn XP (experience points) for every trade you make. Profitable trades earn 10 XP, while unprofitable trades earn 25 XP (we reward learning from mistakes!). Level 1 requires 1,000 XP, and each subsequent level requires an additional 500 XP."
+    answer: "You earn XP (experience points) for every trade you make. Profitable trades earn 75 XP, while unprofitable trades earn 25 XP (we reward learning from mistakes!). Level 1 requires 1,000 XP, and each subsequent level requires an additional 500 XP."
   },
   {
     question: "What are dividends?",
