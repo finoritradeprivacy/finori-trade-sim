@@ -1,26 +1,26 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Mail, ExternalLink } from "lucide-react";
+import { ArrowLeft, Mail, ExternalLink, Instagram, Youtube, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const socialLinks = [
   {
     name: "Instagram",
-    iconSrc: "https://cdn-icons-png.flaticon.com/512/174/174855.png",
+    icon: Instagram,
     url: "https://instagram.com/finoritrade",
     handle: "@finoritrade",
     bgColor: "bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400"
   },
   {
     name: "YouTube",
-    iconSrc: "https://cdn-icons-png.flaticon.com/512/174/174883.png",
+    icon: Youtube,
     url: "https://youtube.com/@finoritrade",
     handle: "@finoritrade",
     bgColor: "bg-red-600"
   },
   {
     name: "Discord",
-    iconSrc: "https://cdn-icons-png.flaticon.com/512/3670/3670157.png",
+    icon: MessageCircle,
     url: "https://discord.gg/9smFbw99",
     handle: "Join our community",
     bgColor: "bg-indigo-600"
@@ -29,6 +29,10 @@ const socialLinks = [
 
 const Contacts = () => {
   const navigate = useNavigate();
+
+  const handleSocialClick = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -73,11 +77,11 @@ const Contacts = () => {
             {socialLinks.map((social, index) => (
               <Card key={index} className="hover:border-primary/50 transition-colors">
                 <button 
-                  onClick={() => window.open(social.url, '_blank', 'noopener,noreferrer')}
+                  onClick={() => handleSocialClick(social.url)}
                   className="flex items-center gap-4 p-4 w-full text-left"
                 >
                   <div className={`p-2 rounded-full ${social.bgColor}`}>
-                    <img src={social.iconSrc} alt={social.name} className="w-6 h-6" />
+                    <social.icon className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1">
                     <h3 className="font-semibold">{social.name}</h3>
