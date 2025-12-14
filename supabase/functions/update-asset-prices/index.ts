@@ -185,10 +185,16 @@ async function performPriceUpdate(supabase: any, updateIndex: number, totalUpdat
     const newPrice = currentPrice * (1 + priceChange / 100);
     
     // Calculate actual 24h change from pre-fetched data
+    // If no 24h old price exists, use the current stored price_change_24h with small drift
     const oldPrice = oldPriceMap.get(asset.id);
-    let new24hChange = 0;
-    if (oldPrice) {
+    let new24hChange: number;
+    if (oldPrice && oldPrice > 0) {
       new24hChange = (newPrice - oldPrice) / oldPrice; // Stored as decimal (0.01 = 1%)
+    } else {
+      // No 24h history yet - apply small random drift to existing change
+      const currentChange = Number(asset.price_change_24h) || 0;
+      const drift = (Math.random() - 0.5) * 0.0002; // Very small drift
+      new24hChange = currentChange + drift;
     }
 
     // Prepare asset update
