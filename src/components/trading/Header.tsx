@@ -127,11 +127,12 @@ const Header = () => {
                   <HelpCircle className="w-4 h-4 mr-2" />
                   FAQ
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a href="mailto:finoritrade.privacy@gmail.com" className="flex items-center cursor-pointer">
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    Feedback
-                  </a>
+                <DropdownMenuItem 
+                  onClick={() => window.location.href = 'mailto:finoritrade.privacy@gmail.com'}
+                  className="cursor-pointer"
+                >
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Feedback
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
