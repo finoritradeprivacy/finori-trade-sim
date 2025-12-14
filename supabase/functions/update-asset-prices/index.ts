@@ -262,11 +262,14 @@ async function performPriceUpdate(supabase: any, updateIndex: number, totalUpdat
       .eq('id', update.id);
   }
 
-  // Insert new candles in batch
+  // Insert new candles using upsert to handle duplicates
   if (candleInserts.length > 0) {
     const { error: candleInsertError } = await supabase
       .from('price_history')
-      .insert(candleInserts);
+      .upsert(candleInserts, { 
+        onConflict: 'asset_id,time',
+        ignoreDuplicates: false 
+      });
     
     if (candleInsertError) {
       console.error('Batch candle insert error:', candleInsertError);
