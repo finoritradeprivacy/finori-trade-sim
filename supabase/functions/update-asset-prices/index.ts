@@ -146,9 +146,22 @@ async function performPriceUpdate(supabase: any, updateIndex: number, totalUpdat
     const currentPrice = Number(asset.current_price);
     const newPrice = currentPrice * (1 + priceChange / 100);
     
-    // Update 24h change (weighted average)
-    const current24hChange = Number(asset.price_change_24h) || 0;
-    const new24hChange = current24hChange * 0.98 + priceChange * 0.02;
+    // Calculate actual 24h change from price history
+    const twentyFourHoursAgo = Math.floor(Date.now() / 1000) - 86400;
+    const { data: oldPriceData } = await supabase
+      .from('price_history')
+      .select('close')
+      .eq('asset_id', asset.id)
+      .lte('time', twentyFourHoursAgo)
+      .order('time', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    let new24hChange = 0;
+    if (oldPriceData && oldPriceData.close) {
+      const oldPrice = Number(oldPriceData.close);
+      new24hChange = (newPrice - oldPrice) / oldPrice; // Stored as decimal (0.01 = 1%)
+    }
 
     // Maintain 1m OHLC candle in price_history
     const candleTime = Math.floor(Date.now() / 1000 / 60) * 60;
