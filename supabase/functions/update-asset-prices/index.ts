@@ -221,16 +221,21 @@ async function performPriceUpdate(supabase: any, updateIndex: number, totalUpdat
     }
   }
 
-  // OPTIMIZED: Execute batch operations
+  // OPTIMIZED: Execute batch updates using Promise.all for parallel execution
   if (assetUpdates.length > 0) {
-    // Batch update assets using upsert
-    const { error: batchUpdateError } = await supabase
-      .from('assets')
-      .upsert(assetUpdates, { onConflict: 'id' });
+    // Use individual updates in parallel (upsert requires all NOT NULL columns)
+    const updatePromises = assetUpdates.map(update => 
+      supabase
+        .from('assets')
+        .update({
+          current_price: update.current_price,
+          price_change_24h: update.price_change_24h,
+          updated_at: update.updated_at,
+        })
+        .eq('id', update.id)
+    );
     
-    if (batchUpdateError) {
-      console.error('Batch asset update error:', batchUpdateError);
-    }
+    await Promise.all(updatePromises);
   }
 
   // Update existing candles in batch
