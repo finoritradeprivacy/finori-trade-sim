@@ -471,6 +471,24 @@ const Auth = () => {
               </div>
             </div>
           </div>
+
+          <p className="text-sm text-muted-foreground mt-6">
+            By using this platform, I agree to{" "}
+            <a 
+              href="https://docs.google.com/document/d/1pDJrRq4CcQAN18keSsrTexdAhXDmeNv14ohOg4wjy8E/edit?usp=sharing" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              this document
+            </a>
+          </p>
+
+          <div className="flex gap-4 mt-4">
+            <a href="/about" className="text-sm text-muted-foreground hover:text-primary transition-colors">About Us</a>
+            <a href="/faq" className="text-sm text-muted-foreground hover:text-primary transition-colors">FAQ</a>
+            <a href="/contacts" className="text-sm text-muted-foreground hover:text-primary transition-colors">Contacts</a>
+          </div>
         </div>
 
         <Card className="p-8 border-glow">

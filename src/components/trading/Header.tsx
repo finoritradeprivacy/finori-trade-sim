@@ -1,11 +1,18 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdmin } from "@/hooks/useAdmin";
 import { Button } from "@/components/ui/button";
-import { LogOut, User, Shield } from "lucide-react";
+import { LogOut, User, Shield, Menu, Info, Phone, HelpCircle, MessageSquare } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { UserNotifications } from "./UserNotifications";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 const Header = () => {
   const { user, signOut } = useAuth();
   const { isAdmin } = useAdmin();
@@ -100,6 +107,35 @@ const Header = () => {
 
           <div className="flex items-center gap-2">
             <UserNotifications />
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => navigate("/about")} className="cursor-pointer">
+                  <Info className="w-4 h-4 mr-2" />
+                  About Us
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/contacts")} className="cursor-pointer">
+                  <Phone className="w-4 h-4 mr-2" />
+                  Contacts
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/faq")} className="cursor-pointer">
+                  <HelpCircle className="w-4 h-4 mr-2" />
+                  FAQ
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href="mailto:finoritrade.privacy@gmail.com" className="flex items-center cursor-pointer">
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Feedback
+                  </a>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button
               variant="ghost"
               size="sm"

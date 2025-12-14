@@ -3,112 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>finori-trade-sim</title>
+    <title>FinoriTrade - Virtual Trading Simulator | Learn Trading Risk-Free</title>
 
-    <meta name="description" content="FinoriTrade Simulation" />
-    <meta property="og:title" content="FinoriTrade Simulation" />
-    <meta property="og:description" content="Simulate trading decisions safely." />
+    <meta name="description" content="Practice trading stocks, crypto, and forex with virtual money. No risk, real experience. Build your trading skills with FinoriTrade simulation platform." />
+    <meta property="og:title" content="FinoriTrade - Virtual Trading Simulator" />
+    <meta property="og:description" content="Practice trading stocks, crypto, and forex with virtual money. No risk, real experience." />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://finoritrade.com/FinoriTrade_logo.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="keywords" content="trading simulator, virtual trading, stock market practice, crypto trading, forex practice, risk-free trading, learn trading" />
+    <link rel="canonical" href="https://finoritrade.com" />
 
     <!-- Google AdSense script -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8299643565438372"
      crossorigin="anonymous"></script>
-
-    <style>
-      .finori-legal-overlay {
-        position: fixed;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background: rgba(0,0,0,0.75);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 99999;
-      }
-      .finori-legal-box {
-        background: #fff;
-        padding: 25px;
-        border-radius: 12px;
-        width: 90%;
-        max-width: 420px;
-        text-align: left;
-        box-shadow: 0 0 20px rgba(0,0,0,0.3);
-        font-family: Arial, sans-serif;
-      }
-      #finori-accept-btn {
-        margin-top: 15px;
-        width: 100%;
-        padding: 12px;
-        background: #0070f3;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 16px;
-      }
-    </style>
   </head>
 
   <body>
-
-    <!-- LEGAL AGE & TERMS GATE -->
-    <div id="finori-legal-gate" style="display: none;">
-      <div class="finori-legal-overlay">
-        <div class="finori-legal-box">
-          <h2 style="margin-bottom: 15px; color: #000; font-weight: bold;">Terms of Use</h2>
-
-          <p style="margin-bottom: 15px; font-size: 14px; color: #333;">
-            By accessing or using the Service, you agree to these Terms of Use and the Privacy Policy (collectively, the "Terms").
-            If you do not agree with these Terms, you may not use the Service.
-          </p>
-
-          <label style="display:flex; gap: 10px; margin-top: 15px; align-items: flex-start;">
-            <input type="checkbox" id="finori-age-check" style="margin-top: 3px;">
-            <span style="font-size: 14px; color: #000;">By using this platform I agree that I am over 18 years old.</span>
-          </label>
-
-          <label style="display:flex; gap: 10px; margin-top: 10px; align-items: flex-start;">
-            <input type="checkbox" id="finori-simulator-check" style="margin-top: 3px;">
-            <span style="font-size: 14px; color: #000;">I agree that I am aware that FinoriTrade is strictly a virtual trading simulator.</span>
-          </label>
-
-          <label style="display:flex; gap: 10px; margin-top: 10px; align-items: flex-start;">
-            <input type="checkbox" id="finori-terms-check" style="margin-top: 3px;">
-            <span style="font-size: 14px; color: #000;">I agree with everything stated in <a href="https://docs.google.com/document/d/1pDJrRq4CcQAN18keSsrTexdAhXDmeNv14ohOg4wjy8E/edit?usp=sharing" target="_blank" style="color: #0070f3;">this document</a>.</span>
-          </label>
-
-          <button id="finori-accept-btn">Continue</button>
-        </div>
-      </div>
-    </div>
-
-    <script>
-      document.addEventListener("DOMContentLoaded", () => {
-        const storedConsent = localStorage.getItem("finori_legal_consent");
-
-        if (!storedConsent) {
-          document.getElementById("finori-legal-gate").style.display = "block";
-        }
-
-        document.getElementById("finori-accept-btn").addEventListener("click", () => {
-          const age = document.getElementById("finori-age-check").checked;
-          const simulator = document.getElementById("finori-simulator-check").checked;
-          const terms = document.getElementById("finori-terms-check").checked;
-
-          if (!age || !simulator || !terms) {
-            alert("You must agree to all conditions to continue.");
-            return;
-          }
-
-          localStorage.setItem("finori_legal_consent", "true");
-          document.getElementById("finori-legal-gate").style.display = "none";
-        });
-      });
-    </script>
-
     <div id="root"></div>
 
     <ins class="adsbygoogle"
