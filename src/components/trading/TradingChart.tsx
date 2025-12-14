@@ -72,7 +72,6 @@ export const TradingChart = ({
     const interval = setInterval(() => {
       setPriceCountdown(calculateCountdown());
     }, 100);
-
     return () => clearInterval(interval);
   }, [asset?.updated_at]);
 
@@ -383,7 +382,6 @@ export const TradingChart = ({
   // Load trades for current asset
   useEffect(() => {
     if (!asset) return;
-    
     const loadTrades = async () => {
       const {
         data: {
@@ -418,26 +416,17 @@ export const TradingChart = ({
         setTrades(Array.from(uniqueTrades.values()));
       }
     };
-    
     loadTrades();
-    
+
     // Subscribe to new trades for this asset
-    const channel = supabase
-      .channel(`trades-${asset.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'trades',
-          filter: `asset_id=eq.${asset.id}`
-        },
-        () => {
-          loadTrades();
-        }
-      )
-      .subscribe();
-    
+    const channel = supabase.channel(`trades-${asset.id}`).on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'trades',
+      filter: `asset_id=eq.${asset.id}`
+    }, () => {
+      loadTrades();
+    }).subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
@@ -715,24 +704,14 @@ export const TradingChart = ({
       <div className="flex flex-wrap items-center gap-2 px-4 pb-3 border-b border-[#2A2E39]">
         {/* Timeframe selector */}
         <div className="flex gap-1 relative group">
-          {timeframes.map(tf => (
-            <div key={tf} className="relative">
-              <Button 
-                variant={timeframe === tf ? 'default' : 'outline'} 
-                size="sm" 
-                onClick={() => handleTimeframeChange(tf)}
-                disabled={timeframeCooldown > 0 && timeframe !== tf}
-                className={timeframeCooldown > 0 && timeframe !== tf ? 'opacity-50 cursor-not-allowed' : ''}
-              >
+          {timeframes.map(tf => <div key={tf} className="relative">
+              <Button variant={timeframe === tf ? 'default' : 'outline'} size="sm" onClick={() => handleTimeframeChange(tf)} disabled={timeframeCooldown > 0 && timeframe !== tf} className={timeframeCooldown > 0 && timeframe !== tf ? 'opacity-50 cursor-not-allowed' : ''}>
                 {tf}
               </Button>
-            </div>
-          ))}
-          {timeframeCooldown > 0 && (
-            <div className="absolute -top-8 left-0 bg-destructive text-destructive-foreground text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+            </div>)}
+          {timeframeCooldown > 0 && <div className="absolute -top-8 left-0 bg-destructive text-destructive-foreground text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
               Cooldown: {timeframeCooldown}s
-            </div>
-          )}
+            </div>}
         </div>
 
         <div className="w-px h-6 bg-border" />
@@ -754,12 +733,8 @@ export const TradingChart = ({
         <div className="w-px h-6 bg-border" />
 
         {/* Indicators */}
-        <Button variant={showMA ? 'default' : 'outline'} size="sm" onClick={() => setShowMA(!showMA)} title="Moving Average">
-          <Activity className="h-4 w-4" />
-        </Button>
-        <Button variant={showVolume ? 'default' : 'outline'} size="sm" onClick={() => setShowVolume(!showVolume)} title="Volume">
-          <BarChart3 className="h-4 w-4" />
-        </Button>
+        
+        
 
         <div className="w-px h-6 bg-border" />
 
